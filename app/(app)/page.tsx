@@ -10,6 +10,7 @@ import { workoutTemplates } from "@/lib/db/schema";
 import { Button } from "@/components/ui/button";
 import { StartWorkoutButton } from "@/components/start-workout-button";
 import { SignOutButton } from "@/components/sign-out-button";
+import { BugReportButton } from "@/components/bug-report-dialog";
 
 export default async function HomePage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -89,6 +90,10 @@ export default async function HomePage() {
           </ul>
         )}
       </section>
+
+      <footer className="pt-2 text-center">
+        <BugReportButton />
+      </footer>
     </div>
   );
 }

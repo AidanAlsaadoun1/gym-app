@@ -81,3 +81,15 @@ export type LogSetInput = z.infer<typeof logSetSchema>;
 export type UpdateSetInput = z.infer<typeof updateSetSchema>;
 export type GenerateWorkoutInput = z.infer<typeof generateWorkoutSchema>;
 export type SessionPlanEntryInput = z.infer<typeof sessionPlanEntrySchema>;
+
+/* -------------------------------------------------------------------------- */
+/*                              bug reports                                    */
+/* -------------------------------------------------------------------------- */
+
+export const bugReportSchema = z.object({
+  title: z.string().trim().min(3, "Add a short title").max(120),
+  description: z.string().trim().min(10, "Describe what happened").max(5000),
+  url: z.string().url().max(500).optional(),
+});
+
+export type BugReportInput = z.infer<typeof bugReportSchema>;
