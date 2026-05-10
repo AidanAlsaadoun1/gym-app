@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import type { Route } from "next";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -56,7 +57,7 @@ function LoginForm() {
       return;
     }
 
-    router.push(redirectTo);
+    router.push(redirectTo as Route);
     router.refresh();
   };
 
@@ -68,7 +69,11 @@ function LoginForm() {
           Enter your email and password to continue.
         </p>
 
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <form
+          className="mt-6 space-y-4"
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+        >
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -108,7 +113,11 @@ function LoginForm() {
           ) : null}
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : "Sign in"}
+            {isSubmitting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              "Sign in"
+            )}
           </Button>
         </form>
       </div>

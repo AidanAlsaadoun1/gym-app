@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { BarChart3, Dumbbell, History, Home } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { Route } from "next";
 
 const ITEMS = [
   { href: "/", label: "Home", Icon: Home, match: (p: string) => p === "/" },
@@ -43,7 +44,7 @@ export function BottomNav() {
           return (
             <li key={href}>
               <Link
-                href={href}
+                href={href as Route}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex flex-col items-center gap-0.5 rounded-md px-3 py-1.5 transition-colors",
