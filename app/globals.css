@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  /* Surface */
+  --color-bg: oklch(0.99 0.005 250);
+  --color-fg: oklch(0.18 0.015 270);
+  --color-muted: oklch(0.55 0.015 270);
+  --color-border: oklch(0.92 0.01 270);
+
+  /* Accent — indigo. Used for primary buttons + active nav. */
+  --color-accent: oklch(0.55 0.18 265);
+  --color-accent-fg: oklch(0.99 0.005 250);
+
+  /* Secondary accents — used sparingly. */
+  --color-success: oklch(0.65 0.18 155);
+  --color-warning: oklch(0.75 0.16 75);
+  --color-info: oklch(0.66 0.14 225);
+
+  --radius-card: 1rem;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth in-page anchor scroll (used by the history calendar -> session list). */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Mobile: prevent iOS from zooming inputs when font size < 16px */
+input,
+select,
+textarea,
+button {
+  font-size: 16px;
+}
