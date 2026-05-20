@@ -690,6 +690,7 @@ function NumericStepper({
             const n = Number(e.target.value);
             if (Number.isFinite(n)) setClamped(n);
           }}
+          onFocus={(e) => e.target.select()}
           className="h-11 text-center text-lg font-semibold tabular-nums"
         />
         <Button

@@ -459,6 +459,7 @@ function NumberField({
           const v = Number(e.target.value);
           if (Number.isFinite(v)) onChange(Math.min(max, Math.max(min, v)));
         }}
+        onFocus={(e) => e.target.select()}
         className="h-9"
       />
     </div>
