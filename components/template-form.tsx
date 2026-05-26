@@ -25,7 +25,10 @@ import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ExercisePicker, type PickerExercise } from "@/components/exercise-picker";
+import {
+  ExercisePicker,
+  type PickerExercise,
+} from "@/components/exercise-picker";
 import { cn } from "@/lib/utils";
 
 type SplitType =
@@ -92,7 +95,9 @@ export function TemplateForm({
 
   const [name, setName] = useState(initial.name);
   const [splitType, setSplitType] = useState<SplitType>(initial.splitType);
-  const [estimatedMinutes, setEstimatedMinutes] = useState(initial.estimatedMinutes);
+  const [estimatedMinutes, setEstimatedMinutes] = useState(
+    initial.estimatedMinutes,
+  );
   // Internal rows have a stable rowId so dnd-kit can keep React keys steady
   // across reorders.
   type RowItem = TemplateFormExercise & { rowId: string };
@@ -106,8 +111,12 @@ export function TemplateForm({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 180, tolerance: 6 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   const addExercise = (ex: PickerExercise) => {
@@ -448,7 +457,9 @@ function NumberField({
 }) {
   return (
     <div className="space-y-1">
-      <span className="block text-xs font-medium text-neutral-700">{label}</span>
+      <span className="block text-xs font-medium text-neutral-700">
+        {label}
+      </span>
       <Input
         type="number"
         inputMode="numeric"

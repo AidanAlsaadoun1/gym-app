@@ -49,7 +49,7 @@ export function BottomNav() {
                 className={cn(
                   "flex flex-col items-center gap-0.5 rounded-md px-3 py-1.5 transition-colors",
                   active
-                    ? "text-indigo-600"
+                    ? "text-amber-600"
                     : "text-neutral-500 hover:bg-neutral-100",
                 )}
               >

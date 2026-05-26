@@ -2,21 +2,35 @@
 
 @theme {
   /* Surface */
-  --color-bg: oklch(0.99 0.005 250);
-  --color-fg: oklch(0.18 0.015 270);
-  --color-muted: oklch(0.55 0.015 270);
-  --color-border: oklch(0.92 0.01 270);
+  --color-bg: oklch(0.97 0.025 80);
+  --color-fg: oklch(0.2 0.025 65);
+  --color-muted: oklch(0.52 0.025 72);
+  --color-border: oklch(0.88 0.03 80);
 
-  /* Accent — indigo. Used for primary buttons + active nav. */
-  --color-accent: oklch(0.55 0.18 265);
-  --color-accent-fg: oklch(0.99 0.005 250);
+  /* Accent — vibrant golden yellow. Used for primary buttons + active nav. */
+  --color-accent: oklch(0.72 0.21 85);
+  --color-accent-fg: oklch(0.18 0.025 65);
 
   /* Secondary accents — used sparingly. */
-  --color-success: oklch(0.65 0.18 155);
-  --color-warning: oklch(0.75 0.16 75);
-  --color-info: oklch(0.66 0.14 225);
+  --color-success: oklch(0.63 0.18 150);
+  --color-warning: oklch(0.65 0.18 40);
+  --color-info: oklch(0.62 0.16 295);
 
   --radius-card: 1rem;
+
+  /* Override Tailwind's cold neutral grays with warm stone tones.
+     This automatically warms every neutral-* class across all components. */
+  --color-neutral-50: oklch(0.97 0.015 80);
+  --color-neutral-100: oklch(0.94 0.02 78);
+  --color-neutral-200: oklch(0.88 0.025 78);
+  --color-neutral-300: oklch(0.8 0.02 78);
+  --color-neutral-400: oklch(0.65 0.02 78);
+  --color-neutral-500: oklch(0.55 0.02 75);
+  --color-neutral-600: oklch(0.45 0.02 75);
+  --color-neutral-700: oklch(0.35 0.025 70);
+  --color-neutral-800: oklch(0.28 0.025 68);
+  --color-neutral-900: oklch(0.2 0.025 65);
+  --color-neutral-950: oklch(0.14 0.025 63);
 }
 
 html,

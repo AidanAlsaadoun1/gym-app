@@ -108,11 +108,11 @@ export function LiveSession({
   // Lazy initial values from the first exercise's suggestion (or its target
   // reps if there's no history) so the input is correct on first paint,
   // before any effect has a chance to update it.
-  const [pendingWeight, setPendingWeight] = useState<number>(() =>
-    computeInitialPending(exercises[0], lastSetsByExercise).weight,
+  const [pendingWeight, setPendingWeight] = useState<number>(
+    () => computeInitialPending(exercises[0], lastSetsByExercise).weight,
   );
-  const [pendingReps, setPendingReps] = useState<number>(() =>
-    computeInitialPending(exercises[0], lastSetsByExercise).reps,
+  const [pendingReps, setPendingReps] = useState<number>(
+    () => computeInitialPending(exercises[0], lastSetsByExercise).reps,
   );
   const [isWarmup, setIsWarmup] = useState<boolean>(false);
   const [logging, setLogging] = useState(false);
@@ -205,7 +205,8 @@ export function LiveSession({
   const nextSetNumber = currentSets.length + 1;
   const isAtTargetSets =
     currentExercise !== null &&
-    currentSets.filter((s) => !s.isWarmup).length >= currentExercise.defaultSets;
+    currentSets.filter((s) => !s.isWarmup).length >=
+      currentExercise.defaultSets;
 
   /* -------------------------------- actions -------------------------------- */
 
@@ -298,18 +299,22 @@ export function LiveSession({
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold tracking-tight">Session</h1>
         <p className="text-sm text-neutral-500">
-          This session isn&apos;t linked to a template. Ad-hoc sessions land in a
-          later milestone.
+          This session isn&apos;t linked to a template. Ad-hoc sessions land in
+          a later milestone.
         </p>
         <Button onClick={finish} disabled={finishing}>
-          {finishing ? <Loader2 className="size-4 animate-spin" /> : "End session"}
+          {finishing ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            "End session"
+          )}
         </Button>
       </div>
     );
   }
 
   const last = currentExercise
-    ? lastSetsByExercise[currentExercise.exerciseId] ?? []
+    ? (lastSetsByExercise[currentExercise.exerciseId] ?? [])
     : [];
   const hint = formatLastSetsLine(last);
 
@@ -361,7 +366,11 @@ export function LiveSession({
                 onClick={finish}
                 disabled={finishing}
               >
-                {finishing ? <Loader2 className="size-4 animate-spin" /> : "End"}
+                {finishing ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  "End"
+                )}
               </Button>
               <Button
                 variant="ghost"
@@ -561,7 +570,9 @@ function ExerciseCard({
             </div>
             {exercise.supersetGroup ? (
               <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
-                Superset {SUPERSET_LABELS[exercise.supersetGroup] ?? exercise.supersetGroup}
+                Superset{" "}
+                {SUPERSET_LABELS[exercise.supersetGroup] ??
+                  exercise.supersetGroup}
               </span>
             ) : null}
           </div>
@@ -588,7 +599,9 @@ function ExerciseCard({
           ) : (
             <>
               Set{" "}
-              <span className="font-semibold text-neutral-900">{setNumber}</span>{" "}
+              <span className="font-semibold text-neutral-900">
+                {setNumber}
+              </span>{" "}
               of {exercise.defaultSets} · target {exercise.defaultReps} reps
             </>
           )}
@@ -669,7 +682,9 @@ function NumericStepper({
 
   return (
     <div className="space-y-1.5">
-      <span className="block text-xs font-medium text-neutral-700">{label}</span>
+      <span className="block text-xs font-medium text-neutral-700">
+        {label}
+      </span>
       <div className="flex items-stretch gap-1.5">
         <Button
           type="button"
@@ -1107,7 +1122,10 @@ function SessionComplete({
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div className="grid grid-cols-3 gap-2">
-            <SummaryStat label="Tonnage" value={formatTonnageKg(summary.tonnage)} />
+            <SummaryStat
+              label="Tonnage"
+              value={formatTonnageKg(summary.tonnage)}
+            />
             <SummaryStat
               label="Working sets"
               value={String(summary.workingSets)}
@@ -1130,7 +1148,10 @@ function SessionComplete({
               {summary.muscles.map(({ group, sets }) => {
                 const tone = muscleTone(group);
                 const maxSets = summary.muscles[0]?.sets ?? 1;
-                const widthPct = Math.max(8, Math.round((sets / maxSets) * 100));
+                const widthPct = Math.max(
+                  8,
+                  Math.round((sets / maxSets) * 100),
+                );
                 return (
                   <li
                     key={group}
@@ -1149,7 +1170,10 @@ function SessionComplete({
                       <div className="h-2 flex-1 overflow-hidden rounded-full bg-neutral-100">
                         <div
                           className={cn("h-full rounded-full", tone.bg)}
-                          style={{ width: `${widthPct}%`, filter: "saturate(2)" }}
+                          style={{
+                            width: `${widthPct}%`,
+                            filter: "saturate(2)",
+                          }}
                         />
                       </div>
                     </div>
