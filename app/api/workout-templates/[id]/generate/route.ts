@@ -7,6 +7,7 @@ import {
   workoutTemplates,
 } from "@/lib/db/schema";
 import { ApiError, jsonError, requireSession } from "@/lib/api/auth";
+import { readJson, requireUuid } from "@/lib/api/params";
 import { generateWorkoutSchema } from "@/lib/api/schemas";
 import { generateWorkout } from "@/lib/session/generator";
 
@@ -26,15 +27,17 @@ export async function POST(
   try {
     const session = await requireSession();
     const { id } = await params;
-    const body = await request.json();
-    const { targetMinutes } = generateWorkoutSchema.parse(body);
+    const templateId = requireUuid(id, "template id");
+    const { targetMinutes } = generateWorkoutSchema.parse(
+      await readJson(request),
+    );
 
     const [template] = await db
       .select()
       .from(workoutTemplates)
       .where(
         and(
-          eq(workoutTemplates.id, id),
+          eq(workoutTemplates.id, templateId),
           eq(workoutTemplates.userId, session.user.id),
           isNull(workoutTemplates.deletedAt),
         ),

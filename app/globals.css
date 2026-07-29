@@ -1,54 +1,340 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Theming
+   ---------------------------------------------------------------------------
+   Every colour in the app comes from a semantic token below, never from a raw
+   Tailwind palette class. That's what makes the light/dark switch a one-line
+   change instead of an audit of every component.
+
+   The `dark` variant is class-based: an inline script in app/layout.tsx stamps
+   `class="dark"` or `class="light"` on <html> before first paint, resolved from
+   localStorage and falling back to the OS preference. Because the class is
+   always explicit we never need a prefers-color-scheme media query here.
+--------------------------------------------------------------------------- */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Light — the warm stone/gold scheme. */
+:root {
+  --bg: oklch(0.975 0.008 85);
+  --bg-elevated: oklch(1 0 0);
+  --card: oklch(1 0 0);
+  --card-hover: oklch(0.985 0.006 85);
+  --inset: oklch(0.965 0.01 85);
+  --fg: oklch(0.22 0.02 70);
+  --fg-muted: oklch(0.5 0.018 75);
+  --fg-subtle: oklch(0.63 0.015 78);
+  --border: oklch(0.9 0.012 85);
+  --border-strong: oklch(0.84 0.016 85);
+
+  --accent: oklch(0.78 0.155 84);
+  --accent-hover: oklch(0.82 0.15 86);
+  --accent-fg: oklch(0.24 0.04 70);
+  --accent-soft: oklch(0.95 0.05 85);
+  --accent-ring: oklch(0.78 0.155 84 / 45%);
+
+  --success: oklch(0.6 0.15 150);
+  --success-soft: oklch(0.95 0.05 150);
+  --danger: oklch(0.56 0.2 25);
+  --danger-soft: oklch(0.95 0.05 25);
+  --warning: oklch(0.68 0.16 55);
+  --warning-soft: oklch(0.96 0.05 60);
+  --info: oklch(0.58 0.16 250);
+  --info-soft: oklch(0.95 0.04 250);
+
+  --shadow-color: 40 30% 30%;
+
+  /* Category tones (muscle groups, split types). Only lightness/chroma live
+     here — the hue is passed per-category from lib/ui/tones.ts, so one pair of
+     values keeps every categorical colour legible in this theme. */
+  --tone-l: 0.5;
+  --tone-c: 0.15;
+  --tone-soft-alpha: 0.13;
+
+  color-scheme: light;
+}
+
+/* Dark — the default, and the one tuned to feel like a native gym app:
+   near-black canvas, quietly elevated cards, gold reserved for actions. */
+.dark {
+  --bg: oklch(0.16 0.006 75);
+  --bg-elevated: oklch(0.205 0.007 75);
+  --card: oklch(0.215 0.008 75);
+  --card-hover: oklch(0.245 0.009 75);
+  --inset: oklch(0.185 0.006 75);
+  --fg: oklch(0.97 0.005 85);
+  --fg-muted: oklch(0.72 0.012 80);
+  --fg-subtle: oklch(0.57 0.012 80);
+  --border: oklch(0.29 0.008 75);
+  --border-strong: oklch(0.37 0.01 75);
+
+  --accent: oklch(0.82 0.16 86);
+  --accent-hover: oklch(0.87 0.15 88);
+  --accent-fg: oklch(0.2 0.04 70);
+  --accent-soft: oklch(0.3 0.055 82);
+  --accent-ring: oklch(0.82 0.16 86 / 55%);
+
+  --success: oklch(0.75 0.17 152);
+  --success-soft: oklch(0.3 0.06 152);
+  --danger: oklch(0.66 0.2 25);
+  --danger-soft: oklch(0.32 0.08 25);
+  --warning: oklch(0.78 0.16 60);
+  --warning-soft: oklch(0.32 0.07 60);
+  --info: oklch(0.72 0.15 250);
+  --info-soft: oklch(0.3 0.07 250);
+
+  --shadow-color: 60 20% 2%;
+
+  --tone-l: 0.82;
+  --tone-c: 0.135;
+  --tone-soft-alpha: 0.16;
+
+  color-scheme: dark;
+}
+
+/* `inline` keeps the utilities pointing at the live var(), so toggling the
+   class on <html> re-themes without a rebuild. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-inset: var(--inset);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+}
+
 @theme {
-  /* Surface */
-  --color-bg: oklch(0.97 0.025 80);
-  --color-fg: oklch(0.2 0.025 65);
-  --color-muted: oklch(0.52 0.025 72);
-  --color-border: oklch(0.88 0.03 80);
-
-  /* Accent — vibrant golden yellow. Used for primary buttons + active nav. */
-  --color-accent: oklch(0.72 0.21 85);
-  --color-accent-fg: oklch(0.18 0.025 65);
-
-  /* Secondary accents — used sparingly. */
-  --color-success: oklch(0.63 0.18 150);
-  --color-warning: oklch(0.65 0.18 40);
-  --color-info: oklch(0.62 0.16 295);
+  /* iOS/macOS resolve this to SF Pro, which is exactly the typographic feel
+     we're after on a phone. No webfont fetch, no layout shift. */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, system-ui, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
 
   --radius-card: 1rem;
+  --radius-sheet: 1.5rem;
 
-  /* Override Tailwind's cold neutral grays with warm stone tones.
-     This automatically warms every neutral-* class across all components. */
-  --color-neutral-50: oklch(0.97 0.015 80);
-  --color-neutral-100: oklch(0.94 0.02 78);
-  --color-neutral-200: oklch(0.88 0.025 78);
-  --color-neutral-300: oklch(0.8 0.02 78);
-  --color-neutral-400: oklch(0.65 0.02 78);
-  --color-neutral-500: oklch(0.55 0.02 75);
-  --color-neutral-600: oklch(0.45 0.02 75);
-  --color-neutral-700: oklch(0.35 0.025 70);
-  --color-neutral-800: oklch(0.28 0.025 68);
-  --color-neutral-900: oklch(0.2 0.025 65);
-  --color-neutral-950: oklch(0.14 0.025 63);
+  --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 6%);
+  --shadow-raised: 0 4px 16px -4px hsl(var(--shadow-color) / 14%);
+  --shadow-sheet: 0 -8px 40px -8px hsl(var(--shadow-color) / 30%);
+
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --animate-fade-in: fade-in 0.18s ease-out;
+  --animate-slide-up: slide-up 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-pop: pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-check: check 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+  --animate-rise: rise 0.4s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
-html,
-body {
-  background: var(--color-bg);
-  color: var(--color-fg);
-  -webkit-tap-highlight-color: transparent;
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
-/* Smooth in-page anchor scroll (used by the history calendar -> session list). */
-html {
-  scroll-behavior: smooth;
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12%);
+  }
 }
 
-/* Mobile: prevent iOS from zooming inputs when font size < 16px */
-input,
-select,
-textarea,
-button {
-  font-size: 16px;
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes check {
+  0% {
+    transform: scale(0.5);
+  }
+  60% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@layer base {
+  html {
+    /* The history calendar links to day anchors further down the page. */
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+    /* Kills the rubber-band overscroll that makes a PWA feel like a webpage. */
+    overscroll-behavior-y: none;
+  }
+
+  /* Anything below 16px makes iOS Safari zoom the viewport on focus. Scoped to
+     real text fields — `button` used to be in this list, which silently beat
+     every Tailwind text-* utility (unlayered rules outrank @layer utilities)
+     and forced all button labels to 16px. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* One consistent focus ring, keyboard-only. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Charts
+   ---------------------------------------------------------------------------
+   Recharts paints its marks with SVG *presentation attributes* taken from
+   props (defaulting to its own blue), and it puts any className we pass on the
+   wrapping <g> — never on the inner paths. An inherited CSS colour therefore
+   loses to the child's own attribute, so prop- or class-based theming leaves
+   the chart rendering recharts blue.
+
+   Author CSS rules do outrank presentation attributes, so the marks are styled
+   here by their (stable, documented) class names instead. Bonus: the theme
+   switch re-colours the charts with no JS and no re-render.
+--------------------------------------------------------------------------- */
+@layer components {
+  .chart .recharts-bar-rectangle {
+    fill: var(--accent);
+  }
+
+  .chart .recharts-area-area {
+    fill: var(--accent);
+    fill-opacity: 0.16;
+  }
+
+  .chart .recharts-area-curve {
+    stroke: var(--accent);
+  }
+
+  .chart .recharts-cartesian-grid line {
+    stroke: var(--border);
+  }
+
+  .chart .recharts-cartesian-axis-line,
+  .chart .recharts-cartesian-axis-tick-line {
+    stroke: var(--border);
+  }
+
+  .chart .recharts-cartesian-axis-tick text {
+    fill: var(--fg-subtle);
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .chart .recharts-active-dot circle {
+    fill: var(--accent);
+    stroke: var(--bg);
+  }
+
+  /* Hover crosshair (line/area) and column highlight (bar). */
+  .chart line.recharts-tooltip-cursor {
+    stroke: var(--border-strong);
+  }
+
+  .chart rect.recharts-tooltip-cursor,
+  .chart path.recharts-tooltip-cursor {
+    fill: var(--fg-subtle);
+    fill-opacity: 0.09;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Bottom padding that clears the home-indicator on notched iPhones. */
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Tap feedback — physical, immediate, and the same everywhere. */
+@utility tappable {
+  transition:
+    transform 0.12s var(--ease-spring),
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
 }

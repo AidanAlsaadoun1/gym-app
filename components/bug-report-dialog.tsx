@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Bug, Check, Loader2, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bug, Check, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Sheet } from "@/components/ui/sheet";
 
 const MIN_TITLE = 3;
 const MIN_DESCRIPTION = 10;
@@ -16,14 +17,10 @@ export function BugReportButton() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-700"
-      >
-        <Bug className="size-3.5" />
+      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
+        <Bug className="size-4" />
         Report a bug
-      </button>
+      </Button>
       <BugReportDialog open={open} onClose={() => setOpen(false)} />
     </>
   );
@@ -41,9 +38,7 @@ function BugReportDialog({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
-  const titleRef = useRef<HTMLInputElement>(null);
 
-  // Lock body scroll while open and reset state when (re)opened.
   useEffect(() => {
     if (!open) return;
     setTitle("");
@@ -51,27 +46,18 @@ function BugReportDialog({
     setError(null);
     setSent(false);
     setSubmitting(false);
-    const t = window.setTimeout(() => titleRef.current?.focus(), 50);
-    const original = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.clearTimeout(t);
-      document.body.style.overflow = original;
-    };
   }, [open]);
 
-  if (!open) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError(null);
 
     if (title.trim().length < MIN_TITLE) {
-      setError(`Title needs at least ${MIN_TITLE} characters`);
+      setError(`Give it a title of at least ${MIN_TITLE} characters`);
       return;
     }
     if (description.trim().length < MIN_DESCRIPTION) {
-      setError(`Description needs at least ${MIN_DESCRIPTION} characters`);
+      setError(`Describe what happened in at least ${MIN_DESCRIPTION} characters`);
       return;
     }
 
@@ -83,123 +69,113 @@ function BugReportDialog({
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim(),
-          url:
-            typeof window !== "undefined" ? window.location.href : undefined,
+          url: typeof window !== "undefined" ? window.location.href : undefined,
         }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Could not send report");
+        throw new Error(data.error ?? "Could not send the report");
       }
       setSent(true);
-    } catch (err) {
-      setError((err as Error).message);
+    } catch (caught) {
+      setError((caught as Error).message);
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (sent) {
+    return (
+      <Sheet
+        open={open}
+        onClose={onClose}
+        title="Report sent"
+        footer={
+          <Button className="w-full" onClick={onClose} data-autofocus>
+            Close
+          </Button>
+        }
+      >
+        <div className="px-5 py-8 text-center">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-success-soft text-success">
+            <Check className="size-6" />
+          </div>
+          <h3 className="mt-3.5 text-[16px] font-bold text-fg">
+            Thanks — that helps.
+          </h3>
+          <p className="mx-auto mt-1 max-w-[34ch] text-[13px] text-fg-muted">
+            Your name, email and the page you were on went along with it, so
+            there&apos;s enough context to chase it down.
+          </p>
+        </div>
+      </Sheet>
+    );
+  }
+
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="bug-report-heading"
-      className="fixed inset-0 z-40 flex items-end justify-center bg-neutral-900/50 px-3 pb-3 pt-6 backdrop-blur-sm sm:items-center sm:p-4"
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Report a bug"
+      footer={
+        <Button
+          type="submit"
+          form="bug-report-form"
+          className="w-full"
+          disabled={submitting}
+        >
+          {submitting ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            "Send report"
+          )}
+        </Button>
+      }
     >
-      <div className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-        <header className="flex items-center justify-between border-b border-neutral-200 px-5 py-3">
-          <div className="flex items-center gap-2">
-            <Bug className="size-4 text-rose-500" />
-            <h2 id="bug-report-heading" className="text-base font-semibold">
-              Report a bug
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="inline-flex size-9 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100"
+      <form id="bug-report-form" className="space-y-4 p-4" onSubmit={submit}>
+        <div className="space-y-1.5">
+          <Label htmlFor="bug-title">What went wrong?</Label>
+          <Input
+            id="bug-title"
+            data-autofocus
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            maxLength={MAX_TITLE}
+            placeholder="Sets disappear when I switch exercises"
+            required
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="bug-description">Details</Label>
+          <Textarea
+            id="bug-description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            maxLength={MAX_DESCRIPTION}
+            placeholder="What you did, what you expected, and what happened instead."
+            rows={6}
+            required
+          />
+          <p className="text-right text-[11px] tabular-nums text-fg-subtle">
+            {description.length}/{MAX_DESCRIPTION}
+          </p>
+        </div>
+
+        <p className="rounded-xl border border-border bg-inset px-3 py-2.5 text-[12px] text-fg-muted">
+          Sent by email with your account details, the current page URL and your
+          browser version attached.
+        </p>
+
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-xl border border-danger/40 bg-danger-soft px-3 py-2.5 text-[13px] font-medium text-danger"
           >
-            <X className="size-5" />
-          </button>
-        </header>
-
-        {sent ? (
-          <div className="flex-1 px-5 py-8 text-center">
-            <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <Check className="size-6" />
-            </div>
-            <h3 className="mt-3 text-base font-semibold">Sent — thanks!</h3>
-            <p className="mt-1 text-sm text-neutral-500">
-              I&apos;ll take a look. Your name, email, and the page URL were
-              attached so I have context.
-            </p>
-            <Button onClick={onClose} className="mt-5 w-full">
-              Close
-            </Button>
+            {error}
           </div>
-        ) : (
-          <form className="flex flex-1 flex-col" onSubmit={handleSubmit}>
-            <div className="flex-1 space-y-4 px-5 py-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="bug-title">Title</Label>
-                <Input
-                  id="bug-title"
-                  ref={titleRef}
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  maxLength={MAX_TITLE}
-                  placeholder="Sets disappear after I switch exercises"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="bug-description">What happened?</Label>
-                <textarea
-                  id="bug-description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  maxLength={MAX_DESCRIPTION}
-                  placeholder={
-                    "Steps to reproduce, what you expected, and what you saw instead."
-                  }
-                  rows={6}
-                  className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-base shadow-sm transition-colors placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-                  required
-                />
-                <p className="text-right text-[11px] tabular-nums text-neutral-400">
-                  {description.length}/{MAX_DESCRIPTION}
-                </p>
-              </div>
-
-              <p className="rounded-md border border-neutral-100 bg-neutral-50 px-3 py-2 text-xs text-neutral-500">
-                Sent over email along with your account info, the current page
-                URL, and your browser version so the bug can be tracked down.
-              </p>
-
-              {error ? (
-                <div
-                  role="alert"
-                  className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-                >
-                  {error}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="border-t border-neutral-200 bg-white p-4">
-              <Button type="submit" className="w-full" disabled={submitting}>
-                {submitting ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  "Send report"
-                )}
-              </Button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+        ) : null}
+      </form>
+    </Sheet>
   );
 }

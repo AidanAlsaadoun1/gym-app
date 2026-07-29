@@ -1,9 +1,4 @@
-import {
-  endOfMonth,
-  format,
-  isSameMonth,
-  isToday,
-} from "date-fns";
+import { endOfMonth, format, isSameMonth, isToday } from "date-fns";
 
 import { isoDayKey, monthGridDays } from "@/lib/stats/dates";
 import { cn } from "@/lib/utils";
@@ -11,75 +6,93 @@ import { cn } from "@/lib/utils";
 const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 
 /**
- * Calendar day-key prefix used for hash anchors. The history page renders
- * the matching id on the first session of each day so clicking a day cell
- * smoothly scrolls to it (CSS scroll-behavior: smooth in globals.css).
+ * Day-key prefix for hash anchors. The history list tags the first session of
+ * each day with the matching id, so tapping a day scrolls to it (smooth scroll
+ * comes from globals.css).
  */
 export function dayAnchorId(date: Date | string): string {
   const key = typeof date === "string" ? date : isoDayKey(date);
   return `day-${key}`;
 }
 
+/** Volume tiers → dot opacity, so a heavy week reads darker than a light one. */
+function intensityFor(volume: number, max: number): number {
+  if (volume <= 0 || max <= 0) return 0;
+  const ratio = volume / max;
+  if (ratio > 0.66) return 3;
+  if (ratio > 0.33) return 2;
+  return 1;
+}
+
+const INTENSITY_CLASSES = [
+  "",
+  "bg-accent/35 text-fg",
+  "bg-accent/65 text-accent-fg",
+  "bg-accent text-accent-fg",
+] as const;
+
 export function HistoryCalendar({
   monthStart,
-  sessionDays,
+  volumeByDay,
 }: {
   monthStart: Date;
-  /** Set of "yyyy-MM-dd" keys for days that contain at least one session. */
-  sessionDays: Set<string>;
+  /** "yyyy-MM-dd" → total tonnage logged that day. */
+  volumeByDay: Record<string, number>;
 }) {
   const days = monthGridDays(monthStart);
   const monthEnd = endOfMonth(monthStart);
+  const maxVolume = Math.max(0, ...Object.values(volumeByDay));
 
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white p-3">
-      <div className="mb-2 grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase tracking-wide text-neutral-400">
-        {WEEKDAYS.map((d) => (
-          <span key={d}>{d}</span>
+    <div className="rounded-card border border-border bg-card p-3">
+      <div className="mb-1.5 grid grid-cols-7 gap-1 text-center">
+        {WEEKDAYS.map((day) => (
+          <span
+            key={day}
+            className="text-[10px] font-bold uppercase tracking-[0.06em] text-fg-subtle"
+          >
+            {day}
+          </span>
         ))}
       </div>
+
       <div className="grid grid-cols-7 gap-1">
         {days.map((day) => {
           const inMonth = isSameMonth(day, monthStart) && day <= monthEnd;
           const key = isoDayKey(day);
-          const hasSession = inMonth && sessionDays.has(key);
+          const volume = inMonth ? (volumeByDay[key] ?? 0) : 0;
+          const intensity = intensityFor(volume, maxVolume);
           const today = isToday(day);
 
           const cellClass = cn(
-            "relative flex aspect-square flex-col items-center justify-center rounded-lg text-sm tabular-nums transition-colors",
-            inMonth ? "text-neutral-800" : "text-neutral-300",
-            today && "bg-neutral-100 font-semibold",
-            hasSession && "bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
+            "flex aspect-square items-center justify-center rounded-lg text-[13px] font-semibold tabular-nums transition-colors",
+            inMonth ? "text-fg-muted" : "text-fg-subtle/40",
+            intensity > 0
+              ? INTENSITY_CLASSES[intensity]
+              : today
+                ? "bg-inset"
+                : undefined,
+            today && "ring-1 ring-accent",
           );
 
-          const content = (
-            <>
-              <span>{format(day, "d")}</span>
-              {hasSession ? (
-                <span
-                  aria-hidden
-                  className="absolute bottom-1 size-1.5 rounded-full bg-emerald-500"
-                />
-              ) : null}
-            </>
-          );
+          const label = format(day, "d");
 
-          if (hasSession) {
+          if (intensity > 0) {
             return (
               <a
                 key={key}
                 href={`#${dayAnchorId(key)}`}
-                className={cellClass}
-                aria-label={`Go to sessions on ${format(day, "EEEE d MMMM")}`}
+                className={cn(cellClass, "tappable")}
+                aria-label={`Sessions on ${format(day, "EEEE d MMMM")}`}
               >
-                {content}
+                {label}
               </a>
             );
           }
 
           return (
             <div key={key} className={cellClass} aria-hidden={!inMonth}>
-              {content}
+              {label}
             </div>
           );
         })}

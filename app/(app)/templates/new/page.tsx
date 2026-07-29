@@ -1,21 +1,16 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-
+import { PageHeader } from "@/components/page-header";
 import { TemplateForm } from "@/components/template-form";
+
+export const metadata = { title: "New routine" };
 
 export default function NewTemplatePage() {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Link
-          href="/templates"
-          aria-label="Back"
-          className="-ml-2 inline-flex size-9 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100"
-        >
-          <ArrowLeft className="size-5" />
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">New template</h1>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="New routine"
+        subtitle="Pick your exercises and set the targets."
+        backHref="/templates"
+      />
 
       <TemplateForm
         mode="create"

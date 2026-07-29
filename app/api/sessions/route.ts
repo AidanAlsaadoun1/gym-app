@@ -1,8 +1,9 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { sessions, workoutTemplates } from "@/lib/db/schema";
+import { exercises, sessions, workoutTemplates } from "@/lib/db/schema";
 import { ApiError, jsonError, requireSession } from "@/lib/api/auth";
+import { readJson } from "@/lib/api/params";
 import { startSessionSchema } from "@/lib/api/schemas";
 
 export const runtime = "nodejs";
@@ -18,12 +19,42 @@ export const runtime = "nodejs";
  * (and isn't soft-deleted) before linking the session to it. The optional
  * `plan` is stored verbatim and used by the live screen instead of the
  * template's current `template_exercises`.
+ *
+ * Only one session may be in progress at a time. Starting a second one used to
+ * succeed silently, and since the home screen only ever surfaces the newest
+ * unfinished session, the older one became unreachable — it could never be
+ * finished, so every set logged into it was excluded from history and stats
+ * forever. We now return 409 with the existing session so the client can offer
+ * "resume or discard" instead.
  */
 export async function POST(request: Request) {
   try {
     const session = await requireSession();
-    const body = await request.json().catch(() => ({}));
-    const input = startSessionSchema.parse(body);
+    const input = startSessionSchema.parse(await readJson(request));
+
+    const [existing] = await db
+      .select({
+        id: sessions.id,
+        startTime: sessions.startTime,
+        workoutTemplateId: sessions.workoutTemplateId,
+      })
+      .from(sessions)
+      .where(
+        and(eq(sessions.userId, session.user.id), isNull(sessions.endTime)),
+      )
+      .orderBy(desc(sessions.startTime))
+      .limit(1);
+
+    if (existing) {
+      return Response.json(
+        {
+          error: "A workout is already in progress",
+          code: "session_in_progress",
+          session: existing,
+        },
+        { status: 409 },
+      );
+    }
 
     if (input.workoutTemplateId) {
       const [template] = await db
@@ -50,6 +81,20 @@ export async function POST(request: Request) {
             supersetGroup: entry.supersetGroup ?? null,
           }))
         : null;
+
+    // `plan` is jsonb, so no foreign key protects it. An unknown-but-valid uuid
+    // used to render as an exercise called "(unknown)" that the user could log
+    // sets against — and *that* insert then failed on the real FK with a 500.
+    if (planForDb) {
+      const planIds = Array.from(new Set(planForDb.map((p) => p.exerciseId)));
+      const known = await db
+        .select({ id: exercises.id })
+        .from(exercises)
+        .where(inArray(exercises.id, planIds));
+      if (known.length !== planIds.length) {
+        throw new ApiError(400, "Plan references an unknown exercise");
+      }
+    }
 
     const [created] = await db
       .insert(sessions)

@@ -7,6 +7,7 @@ import {
   workoutTemplates,
 } from "@/lib/db/schema";
 import { ApiError, jsonError, requireSession } from "@/lib/api/auth";
+import { readJson, requireUuid } from "@/lib/api/params";
 import { updateTemplateSchema } from "@/lib/api/schemas";
 
 export const runtime = "nodejs";
@@ -34,7 +35,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const session = await requireSession();
     const { id } = await params;
-    const template = await loadOwnedTemplate(id, session.user.id);
+    const template = await loadOwnedTemplate(
+      requireUuid(id, "template id"),
+      session.user.id,
+    );
 
     const rows = await db
       .select({
@@ -71,10 +75,12 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   try {
     const session = await requireSession();
     const { id } = await params;
-    const template = await loadOwnedTemplate(id, session.user.id);
+    const template = await loadOwnedTemplate(
+      requireUuid(id, "template id"),
+      session.user.id,
+    );
 
-    const body = await request.json();
-    const input = updateTemplateSchema.parse(body);
+    const input = updateTemplateSchema.parse(await readJson(request));
 
     await db.transaction(async (tx) => {
       const updates: Partial<typeof workoutTemplates.$inferInsert> = {
@@ -121,7 +127,10 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
     const session = await requireSession();
     const { id } = await params;
-    const template = await loadOwnedTemplate(id, session.user.id);
+    const template = await loadOwnedTemplate(
+      requireUuid(id, "template id"),
+      session.user.id,
+    );
 
     await db
       .update(workoutTemplates)

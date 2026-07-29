@@ -13,10 +13,8 @@ export function SignOutButton() {
 
   return (
     <Button
-      type="button"
       variant="ghost"
       size="sm"
-      aria-label="Sign out"
       disabled={loading}
       onClick={async () => {
         setLoading(true);

@@ -3,6 +3,7 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { templateExercises, workoutTemplates } from "@/lib/db/schema";
 import { jsonError, requireSession } from "@/lib/api/auth";
+import { readJson } from "@/lib/api/params";
 import { createTemplateSchema } from "@/lib/api/schemas";
 
 export const runtime = "nodejs";
@@ -44,7 +45,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await requireSession();
-    const body = await request.json();
+    const body = await readJson(request);
     const input = createTemplateSchema.parse(body);
 
     const created = await db.transaction(async (tx) => {

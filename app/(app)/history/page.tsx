@@ -1,14 +1,8 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  addMonths,
-  endOfMonth,
-  format,
-  startOfMonth,
-  subMonths,
-} from "date-fns";
-import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { addMonths, format, startOfMonth, subMonths } from "date-fns";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 
 import { auth } from "@/lib/auth";
 import { sessionsInRange, type SessionRollup } from "@/lib/stats/queries";
@@ -19,7 +13,18 @@ import {
   parseMonthParam,
   weekKey,
 } from "@/lib/stats/dates";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SectionLabel } from "@/components/ui/label";
+import { Stat } from "@/components/ui/stat";
 import { HistoryCalendar, dayAnchorId } from "@/components/history-calendar";
+import {
+  formatDayLabel,
+  formatDuration,
+  formatHours,
+  splitTonnage,
+} from "@/lib/ui/format";
+
+export const metadata = { title: "History" };
 
 interface SearchParams {
   month?: string;
@@ -35,10 +40,10 @@ export default async function HistoryPage({
 
   const params = await searchParams;
   const monthStart = parseMonthParam(params?.month);
-  const monthEnd = endOfMonth(monthStart);
   const monthEndExclusive = startOfMonth(addMonths(monthStart, 1));
-  const prev = formatMonthParam(subMonths(monthStart, 1));
-  const next = formatMonthParam(addMonths(monthStart, 1));
+  const previousMonth = formatMonthParam(subMonths(monthStart, 1));
+  const nextMonth = formatMonthParam(addMonths(monthStart, 1));
+  const isCurrentMonth = monthStart >= startOfMonth(new Date());
 
   const monthSessions = await sessionsInRange(
     session.user.id,
@@ -46,89 +51,123 @@ export default async function HistoryPage({
     monthEndExclusive,
   );
 
-  const sessionDays = new Set(monthSessions.map((s) => isoDayKey(s.startTime)));
-  const totalSeconds = monthSessions.reduce((acc, s) => acc + s.durationSeconds, 0);
-  const totalTonnage = monthSessions.reduce((acc, s) => acc + s.tonnage, 0);
+  const volumeByDay: Record<string, number> = {};
+  for (const entry of monthSessions) {
+    const key = isoDayKey(entry.startTime);
+    volumeByDay[key] = (volumeByDay[key] ?? 0) + entry.tonnage;
+  }
 
-  // Group by week for the list view, week starting Monday.
-  const grouped = groupByWeek(monthSessions);
+  const totalSeconds = monthSessions.reduce(
+    (acc, s) => acc + s.durationSeconds,
+    0,
+  );
+  const totalVolume = splitTonnage(
+    monthSessions.reduce((acc, s) => acc + s.tonnage, 0),
+  );
 
   return (
     <div className="space-y-5">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between gap-2">
         <Link
-          href={{ pathname: "/history", query: { month: prev } }}
+          href={{ pathname: "/history", query: { month: previousMonth } }}
           aria-label="Previous month"
-          className="-ml-2 inline-flex size-9 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100"
+          className="tappable -ml-2 flex size-9 shrink-0 items-center justify-center rounded-full text-fg-muted hover:bg-card hover:text-fg"
         >
           <ChevronLeft className="size-5" />
         </Link>
-        <h1 className="text-xl font-semibold tracking-tight">
+        <h1 className="truncate text-[20px] font-bold tracking-tight text-fg">
           {formatMonthHeading(monthStart)}
         </h1>
-        <Link
-          href={{ pathname: "/history", query: { month: next } }}
-          aria-label="Next month"
-          className="-mr-2 inline-flex size-9 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100"
-        >
-          <ChevronRight className="size-5" />
-        </Link>
+        {isCurrentMonth ? (
+          // Nothing to see in the future — keep the arrow from leading nowhere.
+          <span aria-hidden className="size-9 shrink-0" />
+        ) : (
+          <Link
+            href={{ pathname: "/history", query: { month: nextMonth } }}
+            aria-label="Next month"
+            className="tappable -mr-2 flex size-9 shrink-0 items-center justify-center rounded-full text-fg-muted hover:bg-card hover:text-fg"
+          >
+            <ChevronRight className="size-5" />
+          </Link>
+        )}
       </header>
 
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="Sessions" value={String(monthSessions.length)} tone="indigo" />
-        <Stat label="Hours" value={formatHours(totalSeconds)} tone="emerald" />
-        <Stat label="Tonnage" value={formatTonnage(totalTonnage)} tone="amber" />
+        <Stat label="Workouts" value={String(monthSessions.length)} />
+        <Stat label="Time" value={formatHours(totalSeconds)} />
+        <Stat
+          label="Volume"
+          value={totalVolume.value}
+          unit={totalVolume.unit}
+          tone="accent"
+        />
       </div>
 
-      <HistoryCalendar monthStart={monthStart} sessionDays={sessionDays} />
+      <HistoryCalendar monthStart={monthStart} volumeByDay={volumeByDay} />
 
       {monthSessions.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-8 text-center text-sm text-neutral-500">
-          No sessions in {formatMonthHeading(monthStart)}.
-        </div>
+        <EmptyState
+          icon={CalendarDays}
+          title={`Nothing logged in ${format(monthStart, "MMMM")}`}
+          description="Finished workouts show up here with their volume and duration."
+        />
       ) : (
         <ul className="space-y-4">
-          {grouped.map(({ weekStart, sessions }) => (
-            <li key={weekStart} className="space-y-2">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                Week of {format(new Date(weekStart), "EEE d MMM")}
-              </h2>
-              <ul className="space-y-2">
-                {sessions.map((s, sessionIdx) => {
-                  // Tag the first session of each day with a hash anchor so
-                  // the calendar can scroll-to it.
-                  const dayKey = isoDayKey(s.startTime);
-                  const prevDay =
-                    sessionIdx === 0
+          {groupByWeek(monthSessions).map(({ weekStart, sessions }) => (
+            <li key={weekStart}>
+              <SectionLabel>
+                Week of {format(new Date(weekStart), "d MMM")}
+              </SectionLabel>
+              <ul className="mt-2 space-y-2">
+                {sessions.map((entry, index) => {
+                  // Anchor the first session of each day so the calendar can
+                  // scroll straight to it.
+                  const dayKey = isoDayKey(entry.startTime);
+                  const previousDayKey =
+                    index === 0
                       ? null
-                      : isoDayKey(sessions[sessionIdx - 1]!.startTime);
-                  const anchor = prevDay === dayKey ? undefined : dayAnchorId(dayKey);
+                      : isoDayKey(sessions[index - 1]!.startTime);
+                  const anchor =
+                    previousDayKey === dayKey ? undefined : dayAnchorId(dayKey);
+                  const volume = splitTonnage(entry.tonnage);
+
                   return (
                     <li
-                      key={s.id}
+                      key={entry.id}
                       id={anchor}
-                      className="scroll-mt-20 rounded-2xl border border-neutral-200 bg-white p-3"
+                      className="scroll-mt-24 rounded-card border border-border bg-card p-3.5"
                     >
-                      <div className="flex items-baseline justify-between gap-3">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">
-                            {s.templateName ?? "Session"}
+                          <p className="truncate text-[15px] font-bold text-fg">
+                            {entry.templateName ?? "Workout"}
                           </p>
-                          <p className="text-xs text-neutral-500">
-                            {format(s.startTime, "EEE d MMM, HH:mm")} ·{" "}
-                            {s.exerciseCount} ex · {s.workingSets} sets
-                          </p>
-                        </div>
-                        <div className="shrink-0 text-right text-xs text-neutral-500">
-                          <p className="flex items-center gap-1">
-                            <Clock className="size-3" />
-                            {formatDuration(s.durationSeconds)}
-                          </p>
-                          <p className="font-medium text-neutral-700">
-                            {formatTonnage(s.tonnage)}
+                          <p className="mt-0.5 text-[12px] text-fg-subtle">
+                            {formatDayLabel(entry.startTime)} ·{" "}
+                            {format(entry.startTime, "HH:mm")}
                           </p>
                         </div>
+                        <p className="shrink-0 text-right text-[15px] font-bold tabular-nums text-fg">
+                          {volume.value}
+                          <span className="text-[11px] font-semibold text-fg-subtle">
+                            {volume.unit}
+                          </span>
+                        </p>
+                      </div>
+
+                      <div className="mt-2.5 flex items-center gap-3 text-[12px] font-medium text-fg-muted">
+                        <span className="flex items-center gap-1">
+                          <Clock className="size-3.5" />
+                          {formatDuration(entry.durationSeconds)}
+                        </span>
+                        <span>
+                          {entry.exerciseCount}{" "}
+                          {entry.exerciseCount === 1 ? "exercise" : "exercises"}
+                        </span>
+                        <span>
+                          {entry.workingSets}{" "}
+                          {entry.workingSets === 1 ? "set" : "sets"}
+                        </span>
                       </div>
                     </li>
                   );
@@ -142,63 +181,18 @@ export default async function HistoryPage({
   );
 }
 
-const STAT_TONES = {
-  indigo: { wrap: "border-indigo-200 bg-indigo-50", value: "text-indigo-700" },
-  emerald: { wrap: "border-emerald-200 bg-emerald-50", value: "text-emerald-700" },
-  amber: { wrap: "border-amber-200 bg-amber-50", value: "text-amber-800" },
-  neutral: { wrap: "border-neutral-200 bg-white", value: "text-neutral-900" },
-} as const;
-
-function Stat({
-  label,
-  value,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  tone?: keyof typeof STAT_TONES;
-}) {
-  const t = STAT_TONES[tone];
-  return (
-    <div className={`rounded-xl border p-3 text-center ${t.wrap}`}>
-      <p className="text-xs uppercase tracking-wide text-neutral-600">{label}</p>
-      <p className={`mt-0.5 text-lg font-semibold tabular-nums ${t.value}`}>
-        {value}
-      </p>
-    </div>
-  );
-}
-
 function groupByWeek(sessions: SessionRollup[]): {
   weekStart: string;
   sessions: SessionRollup[];
 }[] {
   const map = new Map<string, SessionRollup[]>();
-  for (const s of sessions) {
-    const k = weekKey(s.startTime);
-    const list = map.get(k) ?? [];
-    list.push(s);
-    map.set(k, list);
+  for (const entry of sessions) {
+    const key = weekKey(entry.startTime);
+    const list = map.get(key);
+    if (list) list.push(entry);
+    else map.set(key, [entry]);
   }
   return Array.from(map.entries())
-    .sort((a, b) => (a[0] < b[0] ? 1 : -1)) // newest first
-    .map(([weekStart, sessions]) => ({ weekStart, sessions }));
-}
-
-function formatHours(seconds: number): string {
-  const h = seconds / 3600;
-  if (h >= 10) return `${h.toFixed(0)}h`;
-  return `${h.toFixed(1)}h`;
-}
-
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.round((seconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
-function formatTonnage(kg: number): string {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
-  return `${Math.round(kg)} kg`;
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1)) // newest week first
+    .map(([weekStart, entries]) => ({ weekStart, sessions: entries }));
 }

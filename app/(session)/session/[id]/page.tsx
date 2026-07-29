@@ -13,12 +13,13 @@ import {
   type SessionPlanEntry,
 } from "@/lib/db/schema";
 import { num } from "@/lib/api/serialize";
-import {
-  LiveSession,
-  type ExerciseRow,
-  type LoggedSet,
-  type LastSets,
-} from "@/components/live-session";
+import { bestsByExercise } from "@/lib/stats/queries";
+import { LiveSession } from "@/components/session/live-session";
+import type {
+  ExerciseRow,
+  LastSets,
+  LoggedSet,
+} from "@/lib/session/types";
 
 export default async function SessionPage({
   params,
@@ -36,10 +37,9 @@ export default async function SessionPage({
     .limit(1);
 
   if (!s) notFound();
-  if (s.endTime) {
-    // Already finished — for now bounce to home (history page lands in M6).
-    redirect("/");
-  }
+  // Already finished — there's nothing to log, so send them where the workout
+  // now lives instead of dropping them on the home screen.
+  if (s.endTime) redirect("/history");
 
   // Resolve the exercise list for this session.
   //
@@ -163,6 +163,10 @@ export default async function SessionPage({
   const exerciseIds = exercises.map((e) => e.exerciseId);
   const lastSetsByExercise: Record<string, LastSets> = {};
 
+  // Historical bests power the PR badges. This session is excluded so the
+  // workout is measured against past ones, never against itself.
+  const bests = await bestsByExercise(session.user.id, exerciseIds, s.id);
+
   if (exerciseIds.length > 0) {
     const historyRows = await db
       .select({
@@ -211,6 +215,7 @@ export default async function SessionPage({
       exercises={exercises}
       initialSets={loggedSets}
       lastSetsByExercise={lastSetsByExercise}
+      bests={bests}
     />
   );
 }

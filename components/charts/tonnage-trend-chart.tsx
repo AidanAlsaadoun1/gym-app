@@ -2,14 +2,16 @@
 
 import { format } from "date-fns";
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+
+import { ChartTooltip, formatAxisKg } from "./chart-parts";
 
 export interface WeeklyPoint {
   /** ISO date string of the Monday of the week. */
@@ -20,44 +22,49 @@ export interface WeeklyPoint {
 export function TonnageTrendChart({ data }: { data: WeeklyPoint[] }) {
   if (data.length === 0) {
     return (
-      <p className="px-2 py-6 text-center text-sm text-neutral-500">
-        Logged sessions will plot here.
+      <p className="py-10 text-center text-[13px] text-fg-muted">
+        Finish a workout and the trend starts here.
       </p>
     );
   }
 
-  const formatted = data.map((d) => ({
-    ...d,
-    label: format(new Date(d.weekStart), "d MMM"),
+  const formatted = data.map((point) => ({
+    ...point,
+    label: format(new Date(point.weekStart), "d MMM"),
   }));
 
+  // Twelve weekly labels won't fit on a phone — show every other one.
+  const labelInterval = formatted.length > 8 ? 1 : 0;
+
   return (
-    <div className="h-56 w-full">
+    <div className="chart h-52 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart
+        <AreaChart
           data={formatted}
-          margin={{ top: 8, right: 8, left: -16, bottom: 4 }}
+          margin={{ top: 8, right: 6, left: -18, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-          <YAxis tick={{ fontSize: 11 }} width={48} />
-          <Tooltip
-            contentStyle={{
-              borderRadius: 8,
-              border: "1px solid #e5e7eb",
-              fontSize: 12,
-            }}
-            formatter={(value: number) => [`${Math.round(value)} kg`, "tonnage"]}
+          <CartesianGrid vertical={false} strokeDasharray="2 4" />
+          <XAxis
+            dataKey="label"
+            interval={labelInterval}
+            tickLine={false}
+            axisLine={false}
           />
-          <Line
+          <YAxis
+            width={44}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={formatAxisKg}
+          />
+          <Tooltip content={<ChartTooltip />} />
+          <Area
             type="monotone"
             dataKey="tonnage"
-            stroke="#0ea5e9"
             strokeWidth={2}
-            dot={{ r: 3 }}
-            activeDot={{ r: 5 }}
+            dot={false}
+            activeDot={{ r: 4, strokeWidth: 2 }}
           />
-        </LineChart>
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );

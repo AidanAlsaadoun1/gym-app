@@ -14,6 +14,18 @@ export function middleware(request: NextRequest) {
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
+  // API routes get JSON, never an HTML redirect. A 307 to /login returned the
+  // login *page* with status 200, so a fetch that hit an expired cookie saw
+  // `res.ok === true` and then threw parsing HTML as JSON — mid-workout that
+  // surfaced as "Could not log set" with no hint that re-authenticating was the
+  // fix, and the set was silently lost.
+  if (!isAuthed && pathname.startsWith("/api/")) {
+    return NextResponse.json(
+      { error: "Unauthorized", code: "unauthenticated" },
+      { status: 401 },
+    );
+  }
+
   if (!isAuthed && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

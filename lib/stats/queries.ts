@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, gte, isNotNull, lt, sql } from "drizzle-orm";
+import { addWeeks } from "date-fns";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
@@ -8,6 +9,7 @@ import {
   workoutTemplates,
   type MuscleGroup,
 } from "@/lib/db/schema";
+import { weekKey, weekStart } from "@/lib/stats/dates";
 
 /**
  * All queries here are scoped to a single userId and to *finished* sessions
@@ -51,9 +53,12 @@ export async function sessionsInRange(
       workingSets: sql<number>`COUNT(*) FILTER (WHERE NOT ${setsLog.isWarmup} AND ${setsLog.id} IS NOT NULL)::int`.as(
         "working_sets",
       ),
-      exerciseCount: sql<number>`COUNT(DISTINCT ${setsLog.exerciseId})::int`.as(
-        "exercise_count",
-      ),
+      // Warmup-only exercises don't count: they contribute nothing to tonnage
+      // or working sets, so counting them made cards read "2 ex · 3 sets" for a
+      // session where only one exercise actually did any work.
+      exerciseCount: sql<number>`COUNT(DISTINCT CASE
+        WHEN NOT ${setsLog.isWarmup} THEN ${setsLog.exerciseId}
+      END)::int`.as("exercise_count"),
     })
     .from(sessions)
     .leftJoin(setsLog, eq(setsLog.sessionId, sessions.id))
@@ -131,14 +136,28 @@ export interface WeeklyTonnage {
   tonnage: number;
 }
 
-/** Weekly tonnage for the last `weeks` weeks. Weeks start on Monday. */
+/**
+ * Weekly tonnage from `fromInclusive` forward, one entry per week including
+ * weeks with no training.
+ *
+ * Bucketing happens in JS rather than with `date_trunc('week', ...)`. The SQL
+ * version truncated in the database's timezone (UTC on Neon) while every other
+ * week boundary in the app comes from date-fns in local time, so for anyone not
+ * on UTC a Monday-morning session landed in the previous week — the stats
+ * page's "this week" tile and the last bar of this chart disagreed about the
+ * same sets. One implementation, one boundary.
+ *
+ * Zero weeks used to be absent entirely, which made the trend line skip over
+ * rest weeks and compress the x-axis instead of showing the dip.
+ */
 export async function weeklyTonnage(
   userId: string,
   fromInclusive: Date,
+  weeks: number,
 ): Promise<WeeklyTonnage[]> {
   const rows = await db
     .select({
-      weekStart: sql<Date>`date_trunc('week', ${sessions.startTime})`.as("week_start"),
+      startTime: sessions.startTime,
       tonnage: sql<string>`COALESCE(SUM(${setsLog.weightKg} * ${setsLog.repsCompleted}), 0)`.as(
         "tonnage",
       ),
@@ -153,11 +172,97 @@ export async function weeklyTonnage(
         gte(sessions.startTime, fromInclusive),
       ),
     )
-    .groupBy(sql`date_trunc('week', ${sessions.startTime})`)
-    .orderBy(asc(sql`date_trunc('week', ${sessions.startTime})`));
+    .groupBy(sessions.id)
+    .orderBy(asc(sessions.startTime));
 
-  return rows.map((r) => ({
-    weekStart: new Date(r.weekStart as unknown as string),
-    tonnage: Number(r.tonnage),
-  }));
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    const key = weekKey(row.startTime);
+    totals.set(key, (totals.get(key) ?? 0) + Number(row.tonnage));
+  }
+
+  const series: WeeklyTonnage[] = [];
+  let cursor = weekStart(fromInclusive);
+  for (let i = 0; i < weeks; i++) {
+    series.push({ weekStart: cursor, tonnage: totals.get(weekKey(cursor)) ?? 0 });
+    cursor = addWeeks(cursor, 1);
+  }
+  return series;
+}
+
+export interface PeriodSummary {
+  sessionCount: number;
+  tonnage: number;
+  workingSets: number;
+  durationSeconds: number;
+}
+
+/** Headline totals for a date range — the home and history summary rows. */
+export async function periodSummary(
+  userId: string,
+  from: Date,
+  to: Date,
+): Promise<PeriodSummary> {
+  const rollups = await sessionsInRange(userId, from, to);
+  return rollups.reduce<PeriodSummary>(
+    (acc, s) => ({
+      sessionCount: acc.sessionCount + 1,
+      tonnage: acc.tonnage + s.tonnage,
+      workingSets: acc.workingSets + s.workingSets,
+      durationSeconds: acc.durationSeconds + s.durationSeconds,
+    }),
+    { sessionCount: 0, tonnage: 0, workingSets: 0, durationSeconds: 0 },
+  );
+}
+
+export interface ExerciseBest {
+  /** Heaviest working set ever logged for this exercise. */
+  bestWeightKg: number;
+  /** Best single-set volume (weight × reps) — the "best set" PR. */
+  bestSetVolume: number;
+}
+
+/**
+ * Personal bests per exercise across finished sessions, for the PR badges on
+ * the live screen. Excludes warmups and the session passed as `excludeSessionId`
+ * so an in-progress workout is compared against history rather than itself.
+ */
+export async function bestsByExercise(
+  userId: string,
+  exerciseIds: string[],
+  excludeSessionId?: string,
+): Promise<Record<string, ExerciseBest>> {
+  if (exerciseIds.length === 0) return {};
+
+  const rows = await db
+    .select({
+      exerciseId: setsLog.exerciseId,
+      bestWeightKg: sql<string>`COALESCE(MAX(${setsLog.weightKg}), 0)`.as(
+        "best_weight",
+      ),
+      bestSetVolume: sql<string>`COALESCE(MAX(${setsLog.weightKg} * ${setsLog.repsCompleted}), 0)`.as(
+        "best_set_volume",
+      ),
+    })
+    .from(setsLog)
+    .innerJoin(sessions, eq(sessions.id, setsLog.sessionId))
+    .where(
+      and(
+        eq(sessions.userId, userId),
+        isNotNull(sessions.endTime),
+        eq(setsLog.isWarmup, false),
+        inArray(setsLog.exerciseId, exerciseIds),
+        excludeSessionId ? ne(setsLog.sessionId, excludeSessionId) : undefined,
+      ),
+    )
+    .groupBy(setsLog.exerciseId);
+
+  const out: Record<string, ExerciseBest> = {};
+  for (const row of rows) {
+    out[row.exerciseId] = {
+      bestWeightKg: Number(row.bestWeightKg),
+      bestSetVolume: Number(row.bestSetVolume),
+    };
+  }
+  return out;
 }

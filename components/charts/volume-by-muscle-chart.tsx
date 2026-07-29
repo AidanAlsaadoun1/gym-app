@@ -10,6 +10,8 @@ import {
   YAxis,
 } from "recharts";
 
+import { ChartTooltip, formatAxisKg } from "./chart-parts";
+
 export interface MuscleVolumePoint {
   muscleGroup: string;
   tonnage: number;
@@ -19,41 +21,52 @@ export interface MuscleVolumePoint {
 export function VolumeByMuscleChart({ data }: { data: MuscleVolumePoint[] }) {
   if (data.length === 0) {
     return (
-      <p className="px-2 py-6 text-center text-sm text-neutral-500">
+      <p className="py-10 text-center text-[13px] text-fg-muted">
         No working sets logged this week yet.
       </p>
     );
   }
 
+  // Sorted by magnitude — this chart answers "what did I train most", and
+  // sorting means reading it left to right instead of hunting.
+  const sorted = [...data].sort((a, b) => b.tonnage - a.tonnage);
+
   return (
-    <div className="h-56 w-full">
+    <div className="chart h-56 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
-          data={data}
-          margin={{ top: 8, right: 8, left: -16, bottom: 4 }}
+          data={sorted}
+          margin={{ top: 8, right: 6, left: -18, bottom: 0 }}
+          barCategoryGap="22%"
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <CartesianGrid vertical={false} strokeDasharray="2 4" />
           <XAxis
             dataKey="muscleGroup"
-            tick={{ fontSize: 11 }}
             interval={0}
-            angle={-30}
+            angle={-38}
             textAnchor="end"
-            height={50}
+            height={52}
+            tickLine={false}
+            axisLine={false}
           />
-          <YAxis tick={{ fontSize: 11 }} width={48} />
+          <YAxis
+            width={44}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={formatAxisKg}
+          />
           <Tooltip
-            cursor={{ fill: "rgba(0,0,0,0.04)" }}
-            contentStyle={{
-              borderRadius: 8,
-              border: "1px solid #e5e7eb",
-              fontSize: 12,
-            }}
-            formatter={(value: number, name: string) =>
-              name === "tonnage" ? [`${Math.round(value)} kg`, "tonnage"] : value
+            content={
+              <ChartTooltip
+                secondary={(entry) =>
+                  entry && typeof entry.workingSets === "number"
+                    ? `${entry.workingSets} working ${entry.workingSets === 1 ? "set" : "sets"}`
+                    : null
+                }
+              />
             }
           />
-          <Bar dataKey="tonnage" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="tonnage" radius={[4, 4, 0, 0]} maxBarSize={38} />
         </BarChart>
       </ResponsiveContainer>
     </div>

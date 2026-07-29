@@ -1,19 +1,30 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { addWeeks, format } from "date-fns";
+import { addWeeks, format, subWeeks } from "date-fns";
+import { TrendingDown, TrendingUp } from "lucide-react";
 
 import { auth } from "@/lib/auth";
 import {
+  periodSummary,
   volumeByMuscle,
   weeklyTonnage,
   type MuscleVolume,
 } from "@/lib/stats/queries";
 import { nWeeksAgoStart, weekStart } from "@/lib/stats/dates";
 import { muscleGroupEnum } from "@/lib/db/schema";
+import { Card } from "@/components/ui/card";
+import { SectionLabel } from "@/components/ui/label";
+import { Stat } from "@/components/ui/stat";
 import { VolumeByMuscleChart } from "@/components/charts/volume-by-muscle-chart";
 import { TonnageTrendChart } from "@/components/charts/tonnage-trend-chart";
+import { muscleHue, toneFill } from "@/lib/ui/tones";
+import { formatTonnage, splitTonnage } from "@/lib/ui/format";
+import { cn } from "@/lib/utils";
 
 const ALL_MUSCLES = muscleGroupEnum.enumValues;
+const TREND_WEEKS = 12;
+
+export const metadata = { title: "Stats" };
 
 export default async function StatsPage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -22,106 +33,119 @@ export default async function StatsPage() {
   const now = new Date();
   const thisWeekStart = weekStart(now);
   const nextWeekStart = addWeeks(thisWeekStart, 1);
+  const lastWeekStart = subWeeks(thisWeekStart, 1);
 
-  const [muscleVolume, trendRows] = await Promise.all([
+  const [muscleVolume, trendRows, thisWeek, lastWeek] = await Promise.all([
     volumeByMuscle(session.user.id, thisWeekStart, nextWeekStart),
-    weeklyTonnage(session.user.id, nWeeksAgoStart(12, now)),
+    weeklyTonnage(session.user.id, nWeeksAgoStart(TREND_WEEKS, now), TREND_WEEKS),
+    periodSummary(session.user.id, thisWeekStart, nextWeekStart),
+    periodSummary(session.user.id, lastWeekStart, thisWeekStart),
   ]);
 
-  // Fill missing muscle groups with zeros so the bar chart always shows the
-  // same x-axis labels regardless of what the user trained.
-  const byMuscle = new Map(
-    muscleVolume.map((m) => [m.muscleGroup, m] as const),
-  );
-  const muscleData = ALL_MUSCLES.map((m) => {
-    const row: MuscleVolume = byMuscle.get(m) ?? {
-      muscleGroup: m,
-      tonnage: 0,
-      workingSets: 0,
-    };
+  const byMuscle = new Map(muscleVolume.map((m) => [m.muscleGroup, m] as const));
+  const muscleData = ALL_MUSCLES.map((muscle) => {
+    const row: MuscleVolume =
+      byMuscle.get(muscle) ??
+      { muscleGroup: muscle, tonnage: 0, workingSets: 0 };
     return {
-      muscleGroup: m,
+      muscleGroup: muscle,
       tonnage: row.tonnage,
       workingSets: row.workingSets,
     };
-  }).filter((d) => d.tonnage > 0 || d.workingSets > 0);
+  }).filter((row) => row.tonnage > 0 || row.workingSets > 0);
 
-  const totalTonnageThisWeek = muscleVolume.reduce(
-    (acc, m) => acc + m.tonnage,
-    0,
-  );
-  const totalSetsThisWeek = muscleVolume.reduce(
-    (acc, m) => acc + m.workingSets,
-    0,
-  );
+  const volume = splitTonnage(thisWeek.tonnage);
+  const delta =
+    lastWeek.tonnage > 0
+      ? (thisWeek.tonnage - lastWeek.tonnage) / lastWeek.tonnage
+      : null;
 
-  const trendData = trendRows.map((r) => ({
-    weekStart: r.weekStart.toISOString(),
-    tonnage: r.tonnage,
+  const trendData = trendRows.map((row) => ({
+    weekStart: row.weekStart.toISOString(),
+    tonnage: row.tonnage,
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Stats</h1>
-        <p className="text-sm text-neutral-500">
-          Week of {format(thisWeekStart, "EEE d MMM")}
+        <h1 className="text-[28px] font-bold tracking-tight text-fg">Stats</h1>
+        <p className="mt-0.5 text-[13px] text-fg-muted">
+          Week of {format(thisWeekStart, "d MMM")}
         </p>
       </header>
 
-      <section className="grid grid-cols-2 gap-2">
-        <Stat label="Tonnage this week" value={formatTonnage(totalTonnageThisWeek)} />
-        <Stat label="Working sets" value={String(totalSetsThisWeek)} />
+      <section className="grid grid-cols-3 gap-2">
+        <Stat
+          label="Volume"
+          value={volume.value}
+          unit={volume.unit}
+          tone="accent"
+        />
+        <Stat label="Sets" value={String(thisWeek.workingSets)} />
+        <Stat label="Workouts" value={String(thisWeek.sessionCount)} />
       </section>
 
-      <Card title="Volume by muscle group">
-        <VolumeByMuscleChart data={muscleData} />
-        {muscleData.length > 0 ? (
-          <ul className="mt-2 grid grid-cols-2 gap-1 text-xs text-neutral-500">
-            {muscleData.map((m) => (
-              <li
-                key={m.muscleGroup}
-                className="flex items-center justify-between rounded-md border border-neutral-100 px-2 py-1"
-              >
-                <span className="capitalize">{m.muscleGroup}</span>
-                <span className="font-medium tabular-nums text-neutral-700">
-                  {m.workingSets}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </Card>
+      {delta !== null ? (
+        <Card padding="sm" className="flex items-center gap-2.5">
+          <span
+            className={cn(
+              "flex size-8 shrink-0 items-center justify-center rounded-full",
+              delta >= 0
+                ? "bg-success-soft text-success"
+                : "bg-warning-soft text-warning",
+            )}
+          >
+            {delta >= 0 ? (
+              <TrendingUp className="size-4" />
+            ) : (
+              <TrendingDown className="size-4" />
+            )}
+          </span>
+          <p className="text-[13px] text-fg-muted">
+            <span className="font-bold text-fg">
+              {delta >= 0 ? "+" : ""}
+              {Math.round(delta * 100)}%
+            </span>{" "}
+            volume vs last week ({formatTonnage(lastWeek.tonnage)})
+          </p>
+        </Card>
+      ) : null}
 
-      <Card title="Tonnage — last 12 weeks">
-        <TonnageTrendChart data={trendData} />
-      </Card>
+      <section>
+        <SectionLabel>Volume by muscle · this week</SectionLabel>
+        <Card className="mt-2" padding="sm">
+          <VolumeByMuscleChart data={muscleData} />
+          {muscleData.length > 0 ? (
+            <ul className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 px-1">
+              {muscleData.map((row) => (
+                <li
+                  key={row.muscleGroup}
+                  className="flex items-center gap-2 py-0.5"
+                >
+                  <span
+                    aria-hidden
+                    className="size-2 shrink-0 rounded-full"
+                    style={toneFill(muscleHue(row.muscleGroup))}
+                  />
+                  <span className="flex-1 truncate text-[12px] capitalize text-fg-muted">
+                    {row.muscleGroup}
+                  </span>
+                  <span className="text-[12px] font-bold tabular-nums text-fg">
+                    {row.workingSets}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </Card>
+      </section>
+
+      <section>
+        <SectionLabel>Weekly volume · last {TREND_WEEKS} weeks</SectionLabel>
+        <Card className="mt-2" padding="sm">
+          <TonnageTrendChart data={trendData} />
+        </Card>
+      </section>
     </div>
   );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-neutral-200 bg-white p-4">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-        {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-3">
-      <p className="text-xs uppercase tracking-wide text-neutral-500">{label}</p>
-      <p className="mt-0.5 text-xl font-semibold tabular-nums">{value}</p>
-    </div>
-  );
-}
-
-function formatTonnage(kg: number): string {
-  if (kg === 0) return "0 kg";
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
-  return `${Math.round(kg)} kg`;
 }

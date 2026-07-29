@@ -3,6 +3,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { sessions, setsLog } from "@/lib/db/schema";
 import { ApiError, jsonError, requireSession } from "@/lib/api/auth";
+import { readJson, requireUuid } from "@/lib/api/params";
 import { updateSessionSchema } from "@/lib/api/schemas";
 import { num } from "@/lib/api/serialize";
 
@@ -25,7 +26,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const session = await requireSession();
     const { id } = await params;
-    const s = await loadOwnedSession(id, session.user.id);
+    const s = await loadOwnedSession(
+      requireUuid(id, "session id"),
+      session.user.id,
+    );
 
     const setsRaw = await db
       .select()
@@ -50,12 +54,21 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   try {
     const session = await requireSession();
     const { id } = await params;
-    const s = await loadOwnedSession(id, session.user.id);
+    const s = await loadOwnedSession(
+      requireUuid(id, "session id"),
+      session.user.id,
+    );
 
-    const body = await request.json();
-    const input = updateSessionSchema.parse(body);
+    const input = updateSessionSchema.parse(await readJson(request));
 
-    await db.update(sessions).set({ notes: input.notes ?? null }).where(eq(sessions.id, s.id));
+    // An omitted `notes` means "leave it alone". Coalescing to null instead
+    // meant `PATCH {}` erased whatever the user had written.
+    if (input.notes !== undefined) {
+      await db
+        .update(sessions)
+        .set({ notes: input.notes })
+        .where(eq(sessions.id, s.id));
+    }
     return Response.json({ ok: true });
   } catch (err) {
     return jsonError(err);
@@ -67,7 +80,10 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
     const session = await requireSession();
     const { id } = await params;
-    const s = await loadOwnedSession(id, session.user.id);
+    const s = await loadOwnedSession(
+      requireUuid(id, "session id"),
+      session.user.id,
+    );
 
     await db.delete(sessions).where(eq(sessions.id, s.id));
     return Response.json({ ok: true });

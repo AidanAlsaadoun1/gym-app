@@ -9,10 +9,48 @@ export const Input = React.forwardRef<
     type={type}
     ref={ref}
     className={cn(
-      "flex h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-base shadow-sm transition-colors placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-red-400 aria-invalid:focus-visible:ring-red-500",
+      "flex h-11 w-full rounded-xl border border-border bg-inset px-3.5 py-2 text-fg transition-colors",
+      "placeholder:text-fg-subtle",
+      "focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/35",
+      "disabled:cursor-not-allowed disabled:opacity-50",
+      "aria-invalid:border-danger aria-invalid:focus:ring-danger/35",
       className,
     )}
     {...props}
   />
 ));
 Input.displayName = "Input";
+
+export const Textarea = React.forwardRef<
+  HTMLTextAreaElement,
+  React.TextareaHTMLAttributes<HTMLTextAreaElement>
+>(({ className, ...props }, ref) => (
+  <textarea
+    ref={ref}
+    className={cn(
+      "flex w-full rounded-xl border border-border bg-inset px-3.5 py-2.5 text-fg transition-colors",
+      "placeholder:text-fg-subtle",
+      "focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/35",
+      "disabled:cursor-not-allowed disabled:opacity-50",
+      className,
+    )}
+    {...props}
+  />
+));
+Textarea.displayName = "Textarea";
+
+export const Select = React.forwardRef<
+  HTMLSelectElement,
+  React.SelectHTMLAttributes<HTMLSelectElement>
+>(({ className, ...props }, ref) => (
+  <select
+    ref={ref}
+    className={cn(
+      "h-11 w-full appearance-none rounded-xl border border-border bg-inset px-3.5 text-fg transition-colors",
+      "focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/35",
+      className,
+    )}
+    {...props}
+  />
+));
+Select.displayName = "Select";

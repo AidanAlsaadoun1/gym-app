@@ -1,4 +1,5 @@
 import { ApiError, jsonError, requireSession } from "@/lib/api/auth";
+import { readJson } from "@/lib/api/params";
 import { bugReportSchema } from "@/lib/api/schemas";
 import {
   EmailNotConfiguredError,
@@ -17,7 +18,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     const session = await requireSession();
-    const body = await request.json();
+    const body = await readJson(request);
     const input = bugReportSchema.parse(body);
 
     await sendBugReport({

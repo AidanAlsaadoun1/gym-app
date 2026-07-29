@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Play, X } from "lucide-react";
+import { Loader2, Play } from "lucide-react";
 
+import { Badge, Chip } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { SectionLabel } from "@/components/ui/label";
+import { Sheet } from "@/components/ui/sheet";
+import { Stepper } from "@/components/ui/number-input";
+import { useToast } from "@/components/ui/toast";
+import { muscleHue, toneStyle } from "@/lib/ui/tones";
 
 interface PlanItem {
   exerciseId: string;
@@ -38,286 +42,252 @@ interface GenerateResponse {
 }
 
 const PRESETS = [30, 45, 60, 75];
+const PREVIEW_DEBOUNCE_MS = 250;
 
+/**
+ * Trims a routine to fit the time you actually have, then starts it as a
+ * one-off session without touching the saved routine.
+ */
 export function GenerateDialog({
   templateId,
+  templateName,
   defaultMinutes,
   open,
   onClose,
 }: {
   templateId: string;
+  templateName?: string;
   defaultMinutes: number;
   open: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [target, setTarget] = useState<number>(defaultMinutes);
+  const toast = useToast();
+  const [target, setTarget] = useState(defaultMinutes);
   const [data, setData] = useState<GenerateResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const debounce = useRef<number | null>(null);
 
-  // Reset when (re)opened.
-  useEffect(() => {
-    if (open) {
-      setTarget(defaultMinutes);
-      setData(null);
-      setError(null);
-    }
-  }, [open, defaultMinutes]);
-
-  // Lock body scroll while open.
   useEffect(() => {
     if (!open) return;
-    const original = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = original;
-    };
-  }, [open]);
+    setTarget(defaultMinutes);
+    setData(null);
+  }, [open, defaultMinutes]);
 
-  // Debounced preview fetch on target change.
+  const fetchPreview = useCallback(
+    async (minutes: number) => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `/api/workout-templates/${templateId}/generate`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ targetMinutes: minutes }),
+          },
+        );
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error ?? "Could not build a plan");
+        setData(json as GenerateResponse);
+      } catch (error) {
+        toast((error as Error).message, "error");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [templateId, toast],
+  );
+
   useEffect(() => {
     if (!open) return;
     if (debounce.current) window.clearTimeout(debounce.current);
-    debounce.current = window.setTimeout(() => {
-      fetchPreview(target);
-    }, 250);
+    debounce.current = window.setTimeout(
+      () => void fetchPreview(target),
+      PREVIEW_DEBOUNCE_MS,
+    );
     return () => {
       if (debounce.current) window.clearTimeout(debounce.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, open]);
-
-  const fetchPreview = async (minutes: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/workout-templates/${templateId}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetMinutes: minutes }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error ?? "Could not generate plan");
-      }
-      const json = (await res.json()) as GenerateResponse;
-      setData(json);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [target, open, fetchPreview]);
 
   const start = async () => {
     if (!data) return;
     setStarting(true);
-    setError(null);
     try {
       const res = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           workoutTemplateId: templateId,
-          plan: data.plan.map((p) => ({
-            exerciseId: p.exerciseId,
-            defaultSets: p.plannedSets,
-            defaultReps: p.defaultReps,
-            exerciseOrder: p.exerciseOrder,
-            supersetGroup: p.supersetGroup,
+          plan: data.plan.map((item) => ({
+            exerciseId: item.exerciseId,
+            defaultSets: item.plannedSets,
+            defaultReps: item.defaultReps,
+            exerciseOrder: item.exerciseOrder,
+            supersetGroup: item.supersetGroup,
           })),
         }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error ?? "Could not start session");
+      const json = await res.json().catch(() => ({}));
+
+      if (res.status === 409) {
+        toast(
+          "A workout's already in progress — resume or discard it first.",
+          "error",
+        );
+        setStarting(false);
+        return;
       }
-      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Could not start this workout");
+
       router.push(`/session/${json.session.id}`);
-    } catch (err) {
-      setError((err as Error).message);
+    } catch (error) {
+      toast((error as Error).message, "error");
       setStarting(false);
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
-      <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
-        <h2 className="text-base font-semibold">Generate workout</h2>
-        <Button variant="ghost" size="icon" aria-label="Close" onClick={onClose}>
-          <X className="size-5" />
-        </Button>
-      </header>
-
-      <div className="space-y-4 border-b border-neutral-200 px-4 py-4">
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-neutral-700">
-            Target session length (minutes)
-          </label>
-          <Input
-            type="number"
-            min={10}
-            max={240}
-            step={5}
-            value={target}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              if (Number.isFinite(v)) setTarget(Math.min(240, Math.max(10, v)));
-            }}
-            className="text-lg font-semibold tabular-nums"
-          />
-        </div>
-
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-          {PRESETS.map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setTarget(m)}
-              className={cn(
-                "shrink-0 rounded-full border px-3 py-1 text-xs font-medium",
-                target === m
-                  ? "border-neutral-900 bg-neutral-900 text-white"
-                  : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50",
-              )}
-            >
-              {m} min
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        {loading && !data ? (
-          <div className="flex h-full items-center justify-center text-neutral-400">
-            <Loader2 className="size-5 animate-spin" />
-          </div>
-        ) : data ? (
-          <div className="space-y-4">
-            <p className="text-sm text-neutral-600">
-              ~<span className="font-semibold tabular-nums">{data.estimatedMinutes}</span>{" "}
-              min ·{" "}
-              <span className="font-semibold tabular-nums">{data.plan.length}</span>{" "}
-              exercise{data.plan.length === 1 ? "" : "s"}
-              {data.changed ? " · trimmed" : " · matches template"}
-            </p>
-
-            <ul className="space-y-2">
-              {data.plan.map((p) => (
-                <li
-                  key={p.exerciseId}
-                  className="rounded-xl border border-neutral-200 bg-white p-3"
-                >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{p.name}</p>
-                      <p className="text-xs uppercase tracking-wide text-neutral-500">
-                        {p.primaryMuscleGroup} · {p.equipment}
-                      </p>
-                    </div>
-                    <p className="shrink-0 text-sm tabular-nums">
-                      <span className="font-semibold">{p.plannedSets}</span> ×{" "}
-                      {p.defaultReps}
-                      {p.plannedSets !== p.defaultSets ? (
-                        <span className="ml-1 text-xs text-neutral-400 line-through">
-                          {p.defaultSets}
-                        </span>
-                      ) : null}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            {data.dropped.length > 0 ? (
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  Dropped ({data.dropped.length})
-                </h3>
-                <ul className="mt-2 space-y-1.5">
-                  {data.dropped.map((d) => (
-                    <li
-                      key={d.exerciseId}
-                      className="flex items-baseline justify-between rounded-lg border border-dashed border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-500"
-                    >
-                      <span className="truncate">{d.name}</span>
-                      <span className="shrink-0 text-xs">
-                        {d.defaultSets} × {d.defaultReps}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <p className="text-sm text-neutral-500">Adjust the target to preview.</p>
-        )}
-
-        {error ? (
-          <div
-            role="alert"
-            className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-          >
-            {error}
-          </div>
-        ) : null}
-      </div>
-
-      <footer className="border-t border-neutral-200 bg-white p-4">
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={templateName ? `Fit "${templateName}" to time` : "Fit to time"}
+      footer={
         <Button
           onClick={start}
           disabled={!data || starting || data.plan.length === 0}
-          className="w-full"
           size="lg"
+          className="w-full"
         >
           {starting ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
             <>
-              <Play className="size-4" />
-              Start workout
+              <Play className="size-4 fill-current" />
+              Start {data ? `${data.estimatedMinutes} min` : ""} workout
             </>
           )}
         </Button>
-      </footer>
-    </div>
+      }
+    >
+      <div className="space-y-4 border-b border-border p-4">
+        <Stepper
+          label="Time available"
+          value={target}
+          onChange={setTarget}
+          step={5}
+          min={10}
+          max={240}
+          integer
+          suffix="min"
+        />
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 no-scrollbar">
+          {PRESETS.map((minutes) => (
+            <Chip
+              key={minutes}
+              active={target === minutes}
+              onClick={() => setTarget(minutes)}
+            >
+              {minutes} min
+            </Chip>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-4">
+        {loading && !data ? (
+          <div className="flex justify-center py-10 text-fg-subtle">
+            <Loader2 className="size-5 animate-spin" />
+          </div>
+        ) : data ? (
+          <div className="space-y-4">
+            <p className="text-[13px] text-fg-muted">
+              <span className="font-bold text-fg">
+                {data.plan.length}{" "}
+                {data.plan.length === 1 ? "exercise" : "exercises"}
+              </span>{" "}
+              · ~{data.estimatedMinutes} min ·{" "}
+              {data.changed ? "trimmed to fit" : "matches the routine"}
+            </p>
+
+            <ul className="divide-y divide-border rounded-card border border-border">
+              {data.plan.map((item) => (
+                <li
+                  key={item.exerciseId}
+                  className="flex items-center justify-between gap-3 px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[14px] font-semibold text-fg">
+                      {item.name}
+                    </p>
+                    <Badge
+                      style={toneStyle(muscleHue(item.primaryMuscleGroup))}
+                      className="mt-1 capitalize"
+                    >
+                      {item.primaryMuscleGroup}
+                    </Badge>
+                  </div>
+                  <p className="shrink-0 text-[13px] font-bold tabular-nums text-fg">
+                    {item.plannedSets} × {item.defaultReps}
+                    {item.plannedSets !== item.defaultSets ? (
+                      <span className="ml-1.5 text-[12px] font-medium text-fg-subtle line-through">
+                        {item.defaultSets}
+                      </span>
+                    ) : null}
+                  </p>
+                </li>
+              ))}
+            </ul>
+
+            {data.dropped.length > 0 ? (
+              <section>
+                <SectionLabel>Dropped ({data.dropped.length})</SectionLabel>
+                <ul className="mt-2 space-y-1.5">
+                  {data.dropped.map((item) => (
+                    <li
+                      key={item.exerciseId}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border px-3 py-2 text-[13px] text-fg-subtle"
+                    >
+                      <span className="truncate line-through">{item.name}</span>
+                      <span className="shrink-0 tabular-nums">
+                        {item.defaultSets} × {item.defaultReps}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </div>
+        ) : (
+          <p className="py-10 text-center text-[13px] text-fg-subtle">
+            Set the time you have and we&apos;ll shape the session around it.
+          </p>
+        )}
+      </div>
+    </Sheet>
   );
 }
 
-/** Wrapper button — opens the dialog in its own state. */
+/** Standalone trigger — used on the routine edit screen. */
 export function GenerateButton({
   templateId,
+  templateName,
   defaultMinutes,
-  size = "sm",
-  variant = "outline",
-  className,
 }: {
   templateId: string;
+  templateName?: string;
   defaultMinutes: number;
-  size?: "default" | "sm" | "lg";
-  variant?: "default" | "outline" | "ghost";
-  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button
-        type="button"
-        variant={variant}
-        size={size}
-        className={className}
-        onClick={() => setOpen(true)}
-      >
-        Generate
+      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+        Fit to time
       </Button>
       <GenerateDialog
         templateId={templateId}
+        templateName={templateName}
         defaultMinutes={defaultMinutes}
         open={open}
         onClose={() => setOpen(false)}

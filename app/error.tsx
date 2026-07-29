@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-import { AlertTriangle } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export default function GlobalError({
   error,
@@ -13,29 +14,31 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Surface in the console — Vercel will pick this up in runtime logs too.
+    // Surface in the console — Vercel picks this up in runtime logs too.
     console.error(error);
   }, [error]);
 
   return (
     <div className="flex min-h-dvh items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm">
-        <AlertTriangle className="mx-auto size-8 text-amber-500" />
-        <h1 className="mt-3 text-lg font-semibold tracking-tight">
+      <Card padding="lg" className="w-full max-w-sm text-center">
+        <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-danger-soft text-danger">
+          <TriangleAlert className="size-6" />
+        </div>
+        <h1 className="mt-3.5 text-[18px] font-bold tracking-tight text-fg">
           Something broke
         </h1>
-        <p className="mt-1 text-sm text-neutral-500">
+        <p className="mt-1 text-[13px] text-fg-muted">
           {error.message || "An unexpected error occurred."}
         </p>
         {error.digest ? (
-          <p className="mt-2 font-mono text-xs text-neutral-400">
+          <p className="mt-2 font-mono text-[11px] text-fg-subtle">
             id: {error.digest}
           </p>
         ) : null}
         <Button onClick={reset} className="mt-5 w-full">
           Try again
         </Button>
-      </div>
+      </Card>
     </div>
   );
 }

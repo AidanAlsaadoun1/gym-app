@@ -1,4 +1,7 @@
 import type { Metadata, Viewport } from "next";
+
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -25,18 +28,23 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
-  ],
+  // Kept in sync with the resolved theme by lib/theme.ts.
+  themeColor: "#1b1a18",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-dvh antialiased">{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          // Must run before first paint to avoid a light flash on dark loads.
+          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
+        />
+      </head>
+      <body className="min-h-dvh bg-bg font-sans text-fg antialiased">
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }

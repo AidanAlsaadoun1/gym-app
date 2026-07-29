@@ -1,23 +1,30 @@
 import Link from "next/link";
 import { Compass } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export default function NotFound() {
   return (
     <div className="flex min-h-dvh items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm">
-        <Compass className="mx-auto size-8 text-neutral-400" />
-        <h1 className="mt-3 text-lg font-semibold tracking-tight">
+      <Card padding="lg" className="w-full max-w-sm text-center">
+        <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-inset text-fg-subtle">
+          <Compass className="size-6" />
+        </div>
+        <h1 className="mt-3.5 text-[18px] font-bold tracking-tight text-fg">
           Page not found
         </h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          The thing you were looking for isn&apos;t here.
+        <p className="mt-1 text-[13px] text-fg-muted">
+          Whatever you were after isn&apos;t here.
         </p>
-        <Link href="/" className="mt-5 inline-block w-full">
-          <Button className="w-full">Back home</Button>
+        <Link
+          href="/"
+          className={cn(buttonVariants({ size: "md" }), "mt-5 w-full")}
+        >
+          Back home
         </Link>
-      </div>
+      </Card>
     </div>
   );
 }

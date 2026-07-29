@@ -1,7 +1,5 @@
 import { headers } from "next/headers";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { and, asc, eq, isNull } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
@@ -15,6 +13,7 @@ import {
   TemplateForm,
   type TemplateFormExercise,
 } from "@/components/template-form";
+import { PageHeader } from "@/components/page-header";
 import { StartWorkoutButton } from "@/components/start-workout-button";
 import { GenerateButton } from "@/components/generate-dialog";
 
@@ -67,28 +66,22 @@ export default async function EditTemplatePage({
   }));
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <Link
-            href="/templates"
-            aria-label="Back"
-            className="-ml-2 inline-flex size-9 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100"
-          >
-            <ArrowLeft className="size-5" />
-          </Link>
-          <h1 className="truncate text-2xl font-semibold tracking-tight">
-            Edit template
-          </h1>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <GenerateButton
-            templateId={template.id}
-            defaultMinutes={template.estimatedMinutes}
-          />
-          <StartWorkoutButton templateId={template.id} size="sm" />
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title={template.name}
+        subtitle="Editing routine"
+        backHref="/templates"
+        actions={
+          <>
+            <GenerateButton
+              templateId={template.id}
+              templateName={template.name}
+              defaultMinutes={template.estimatedMinutes}
+            />
+            <StartWorkoutButton templateId={template.id} size="sm" />
+          </>
+        }
+      />
 
       <TemplateForm
         mode="edit"

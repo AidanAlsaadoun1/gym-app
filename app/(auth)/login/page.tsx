@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { Dumbbell, Loader2 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -62,15 +62,22 @@ function LoginForm() {
   };
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-neutral-50 px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Enter your email and password to continue.
-        </p>
+    <main className="flex min-h-dvh items-center justify-center px-4 py-10">
+      <div className="w-full max-w-sm">
+        <div className="mb-7 text-center">
+          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-accent text-accent-fg">
+            <Dumbbell className="size-7" />
+          </div>
+          <h1 className="mt-4 text-[26px] font-bold tracking-tight text-fg">
+            Welcome back
+          </h1>
+          <p className="mt-1 text-[13px] text-fg-muted">
+            Sign in to pick up where you left off.
+          </p>
+        </div>
 
         <form
-          className="mt-6 space-y-4"
+          className="space-y-4 rounded-card border border-border bg-card p-5 shadow-card"
           onSubmit={handleSubmit(onSubmit)}
           noValidate
         >
@@ -85,7 +92,9 @@ function LoginForm() {
               aria-invalid={Boolean(errors.email)}
             />
             {errors.email ? (
-              <p className="text-xs text-red-600">{errors.email.message}</p>
+              <p className="text-[12px] font-medium text-danger">
+                {errors.email.message}
+              </p>
             ) : null}
           </div>
 
@@ -99,20 +108,27 @@ function LoginForm() {
               aria-invalid={Boolean(errors.password)}
             />
             {errors.password ? (
-              <p className="text-xs text-red-600">{errors.password.message}</p>
+              <p className="text-[12px] font-medium text-danger">
+                {errors.password.message}
+              </p>
             ) : null}
           </div>
 
           {serverError ? (
             <div
               role="alert"
-              className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+              className="rounded-xl border border-danger/40 bg-danger-soft px-3 py-2.5 text-[13px] font-medium text-danger"
             >
               {serverError}
             </div>
           ) : null}
 
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={isSubmitting}
+          >
             {isSubmitting ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (

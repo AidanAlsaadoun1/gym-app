@@ -3,6 +3,7 @@ import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { sessions, setsLog } from "@/lib/db/schema";
 import { jsonError, requireSession } from "@/lib/api/auth";
+import { requireUuid } from "@/lib/api/params";
 import { num } from "@/lib/api/serialize";
 
 export const runtime = "nodejs";
@@ -20,7 +21,8 @@ export async function GET(
 ) {
   try {
     const session = await requireSession();
-    const { id: exerciseId } = await params;
+    const { id } = await params;
+    const exerciseId = requireUuid(id, "exercise id");
 
     // Find the most recent completed session that contains this exercise.
     const [latest] = await db
@@ -54,7 +56,7 @@ export async function GET(
           eq(setsLog.exerciseId, exerciseId),
         ),
       )
-      .orderBy(asc(setsLog.setNumber));
+      .orderBy(asc(setsLog.setNumber), asc(setsLog.completedAt));
 
     const sets = setsRaw.map((row) => ({
       setNumber: row.setNumber,

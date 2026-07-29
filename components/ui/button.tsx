@@ -2,29 +2,36 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
+/**
+ * `buttonVariants` is exported so links can *look* like buttons without a
+ * <button> nested inside an <a> (invalid HTML, and it swallows taps on iOS).
+ * Reach for it on next/link elements instead of wrapping a <Button>.
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "tappable inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-xl font-semibold disabled:pointer-events-none disabled:opacity-45",
   {
     variants: {
       variant: {
-        default:
-          "bg-amber-400 text-amber-950 shadow-sm hover:bg-amber-300 active:bg-amber-500",
-        outline:
-          "border border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-50 hover:border-neutral-300",
-        ghost: "text-neutral-900 hover:bg-neutral-100",
-        destructive: "bg-red-600 text-white shadow-sm hover:bg-red-700",
-        success: "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700",
+        primary:
+          "bg-accent text-accent-fg shadow-card hover:bg-accent-hover active:bg-accent",
+        secondary:
+          "border border-border bg-card text-fg hover:border-border-strong hover:bg-card-hover",
+        ghost: "text-fg-muted hover:bg-card hover:text-fg",
+        soft: "bg-accent-soft text-accent hover:brightness-110",
+        danger: "bg-danger text-white shadow-card hover:brightness-110",
+        success: "bg-success text-white shadow-card hover:brightness-110",
       },
       size: {
-        default: "h-11 px-4 py-2",
-        sm: "h-9 px-3",
-        lg: "h-12 px-6 text-base",
-        icon: "size-10",
+        sm: "h-9 px-3 text-[13px]",
+        md: "h-11 px-4 text-[15px]",
+        lg: "h-13 px-6 text-base",
+        icon: "size-11",
+        "icon-sm": "size-9",
       },
     },
     defaultVariants: {
-      variant: "default",
-      size: "default",
+      variant: "primary",
+      size: "md",
     },
   },
 );
@@ -35,9 +42,10 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {}
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => (
+  ({ className, variant, size, type = "button", ...props }, ref) => (
     <button
       ref={ref}
+      type={type}
       className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     />

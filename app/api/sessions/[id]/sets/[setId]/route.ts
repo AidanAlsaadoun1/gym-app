@@ -1,8 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { sessions, setsLog } from "@/lib/db/schema";
 import { ApiError, jsonError, requireSession } from "@/lib/api/auth";
+import { readJson, requireUuid } from "@/lib/api/params";
 import { updateSetSchema } from "@/lib/api/schemas";
 import { num } from "@/lib/api/serialize";
 
@@ -10,9 +11,18 @@ export const runtime = "nodejs";
 
 type RouteParams = { params: Promise<{ id: string; setId: string }> };
 
+/**
+ * Resolves a set through its session to the owning user, so a set id alone is
+ * never enough to touch someone else's data.
+ *
+ * Requires the session to still be in progress, matching POST. Without that
+ * check a finished workout's sets stayed editable, which silently rewrote
+ * history: tonnage and working-set counts on the history and stats pages would
+ * change under a session the user had already closed out.
+ */
 async function loadOwnedSet(setId: string, sessionId: string, userId: string) {
   const [row] = await db
-    .select({ set: setsLog, sessionId: sessions.id })
+    .select({ set: setsLog })
     .from(setsLog)
     .innerJoin(sessions, eq(sessions.id, setsLog.sessionId))
     .where(
@@ -20,6 +30,7 @@ async function loadOwnedSet(setId: string, sessionId: string, userId: string) {
         eq(setsLog.id, setId),
         eq(setsLog.sessionId, sessionId),
         eq(sessions.userId, userId),
+        isNull(sessions.endTime),
       ),
     )
     .limit(1);
@@ -32,10 +43,13 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   try {
     const session = await requireSession();
     const { id, setId } = await params;
-    const existing = await loadOwnedSet(setId, id, session.user.id);
+    const existing = await loadOwnedSet(
+      requireUuid(setId, "set id"),
+      requireUuid(id, "session id"),
+      session.user.id,
+    );
 
-    const body = await request.json();
-    const input = updateSetSchema.parse(body);
+    const input = updateSetSchema.parse(await readJson(request));
 
     const updates: Partial<typeof setsLog.$inferInsert> = {};
     if (input.weightKg !== undefined) updates.weightKg = input.weightKg.toString();
@@ -67,7 +81,11 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
     const session = await requireSession();
     const { id, setId } = await params;
-    const existing = await loadOwnedSet(setId, id, session.user.id);
+    const existing = await loadOwnedSet(
+      requireUuid(setId, "set id"),
+      requireUuid(id, "session id"),
+      session.user.id,
+    );
 
     await db.delete(setsLog).where(eq(setsLog.id, existing.id));
     return Response.json({ ok: true });

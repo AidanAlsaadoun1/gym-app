@@ -3,7 +3,11 @@
 import { useEffect, useRef } from "react";
 
 const PREFIX = "gym:session:";
-const VERSION = 1;
+// Bumped to 2 when the live screen moved from one-exercise-at-a-time (which
+// saved a cursor + a single pending set) to the full set grid (per-row drafts).
+// `loadAutosave` discards mismatched versions, so old snapshots are ignored
+// rather than half-restored.
+const VERSION = 2;
 const SAVE_INTERVAL_MS = 5_000;
 
 interface Envelope<T> {

@@ -62,19 +62,27 @@ export const updateSessionSchema = z.object({
 
 export const logSetSchema = z.object({
   exerciseId: z.string().uuid(),
-  setNumber: z.number().int().min(1).max(50),
+  // Accepted for backwards compatibility but ignored — the server assigns the
+  // set number so concurrent/after-delete logging can't collide.
+  setNumber: z.number().int().min(1).max(200).optional(),
   weightKg: z.number().min(0).max(1000),
   repsCompleted: z.number().int().min(0).max(200),
   rpe: z.number().min(1).max(10).nullable().optional(),
   isWarmup: z.boolean().optional().default(false),
 });
 
-export const updateSetSchema = z.object({
-  weightKg: z.number().min(0).max(1000).optional(),
-  repsCompleted: z.number().int().min(0).max(200).optional(),
-  rpe: z.number().min(1).max(10).nullable().optional(),
-  isWarmup: z.boolean().optional(),
-});
+export const updateSetSchema = z
+  .object({
+    weightKg: z.number().min(0).max(1000).optional(),
+    repsCompleted: z.number().int().min(0).max(200).optional(),
+    rpe: z.number().min(1).max(10).nullable().optional(),
+    isWarmup: z.boolean().optional(),
+  })
+  // Drizzle throws "No values to set" on an empty update object, which
+  // surfaced as a 500. Reject it as the 400 it actually is.
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Provide at least one field to update",
+  });
 
 export type StartSessionInput = z.infer<typeof startSessionSchema>;
 export type LogSetInput = z.infer<typeof logSetSchema>;

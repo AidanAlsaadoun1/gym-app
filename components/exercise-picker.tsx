@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { X, Search, Loader2 } from "lucide-react";
+import { Check, Loader2, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { muscleHue, toneColor } from "@/lib/ui/tones";
 
 export interface PickerExercise {
   id: string;
@@ -28,38 +31,42 @@ const MUSCLE_GROUPS = [
   "forearms",
 ] as const;
 
+/**
+ * Full-screen exercise library.
+ *
+ * Multi-select: building a routine means adding five or six exercises, and
+ * re-opening the sheet for each one was the slowest part of the old flow.
+ */
 export function ExercisePicker({
   open,
   onClose,
-  onSelect,
+  onAdd,
 }: {
   open: boolean;
   onClose: () => void;
-  onSelect: (exercise: PickerExercise) => void;
+  onAdd: (exercises: PickerExercise[]) => void;
 }) {
   const [query, setQuery] = useState("");
   const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
   const [exercises, setExercises] = useState<PickerExercise[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
 
-  // Lock body scroll while the sheet is open.
   useEffect(() => {
     if (!open) return;
-    const original = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = original;
-    };
+    setQuery("");
+    setMuscleFilter(null);
+    setSelected([]);
   }, [open]);
 
-  // Fetch the library on first open. We cache for the lifetime of this
-  // component since the seed list doesn't change at runtime.
+  // The seeded library doesn't change at runtime, so one fetch per mount is
+  // enough — cached for the lifetime of the component.
   useEffect(() => {
     if (!open || exercises !== null) return;
     let cancelled = false;
     setLoading(true);
     fetch("/api/exercises")
-      .then((r) => r.json())
+      .then((res) => res.json())
       .then((data) => {
         if (!cancelled) setExercises(data.exercises ?? []);
       })
@@ -76,114 +83,142 @@ export function ExercisePicker({
 
   const filtered = useMemo(() => {
     if (!exercises) return [];
-    const q = query.trim().toLowerCase();
-    return exercises.filter((ex) => {
-      if (muscleFilter && ex.primaryMuscleGroup !== muscleFilter) return false;
-      if (q && !ex.name.toLowerCase().includes(q)) return false;
+    const needle = query.trim().toLowerCase();
+    return exercises.filter((exercise) => {
+      if (muscleFilter && exercise.primaryMuscleGroup !== muscleFilter) {
+        return false;
+      }
+      if (needle && !exercise.name.toLowerCase().includes(needle)) return false;
       return true;
     });
   }, [exercises, query, muscleFilter]);
 
-  if (!open) return null;
+  const confirm = () => {
+    if (!exercises || selected.length === 0) return;
+    const byId = new Map(exercises.map((exercise) => [exercise.id, exercise]));
+    // Preserve tap order — that's the order they land in the routine.
+    onAdd(
+      selected
+        .map((id) => byId.get(id))
+        .filter((exercise): exercise is PickerExercise => Boolean(exercise)),
+    );
+    onClose();
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
-      <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
-        <h2 className="text-base font-semibold">Add exercise</h2>
-        <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
-          <X className="size-5" />
+    <Sheet
+      open={open}
+      onClose={onClose}
+      variant="full"
+      title="Add exercises"
+      footer={
+        <Button
+          className="w-full"
+          size="lg"
+          onClick={confirm}
+          disabled={selected.length === 0}
+        >
+          {selected.length === 0
+            ? "Select exercises"
+            : `Add ${selected.length} ${selected.length === 1 ? "exercise" : "exercises"}`}
         </Button>
-      </header>
-
-      <div className="space-y-3 border-b border-neutral-200 px-4 py-3">
+      }
+    >
+      <div className="space-y-3 border-b border-border p-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" />
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(event) => setQuery(event.target.value)}
             placeholder="Search exercises…"
             className="pl-9"
-            autoFocus
+            data-autofocus
           />
         </div>
 
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-          <FilterChip
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 no-scrollbar">
+          <Chip
             active={muscleFilter === null}
             onClick={() => setMuscleFilter(null)}
           >
             All
-          </FilterChip>
-          {MUSCLE_GROUPS.map((m) => (
-            <FilterChip
-              key={m}
-              active={muscleFilter === m}
-              onClick={() => setMuscleFilter(muscleFilter === m ? null : m)}
+          </Chip>
+          {MUSCLE_GROUPS.map((muscle) => (
+            <Chip
+              key={muscle}
+              active={muscleFilter === muscle}
+              onClick={() =>
+                setMuscleFilter(muscleFilter === muscle ? null : muscle)
+              }
             >
-              {m}
-            </FilterChip>
+              {muscle}
+            </Chip>
           ))}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {loading && exercises === null ? (
-          <div className="flex h-full items-center justify-center text-neutral-400">
-            <Loader2 className="size-5 animate-spin" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-neutral-500">
-            No exercises match.
-          </p>
-        ) : (
-          <ul className="divide-y divide-neutral-100">
-            {filtered.map((ex) => (
-              <li key={ex.id}>
+      {loading && exercises === null ? (
+        <div className="flex justify-center py-16 text-fg-subtle">
+          <Loader2 className="size-5 animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <p className="px-4 py-16 text-center text-[13px] text-fg-muted">
+          Nothing matches that.
+        </p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {filtered.map((exercise) => {
+            const isSelected = selected.includes(exercise.id);
+            return (
+              <li key={exercise.id}>
                 <button
                   type="button"
-                  onClick={() => {
-                    onSelect(ex);
-                    onClose();
-                  }}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-neutral-50 active:bg-neutral-100"
+                  aria-pressed={isSelected}
+                  onClick={() =>
+                    setSelected((prev) =>
+                      prev.includes(exercise.id)
+                        ? prev.filter((id) => id !== exercise.id)
+                        : [...prev, exercise.id],
+                    )
+                  }
+                  className={cn(
+                    "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+                    isSelected ? "bg-accent-soft" : "hover:bg-card",
+                  )}
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{ex.name}</p>
-                    <p className="text-xs text-neutral-500">
-                      {ex.primaryMuscleGroup} · {ex.equipment}
-                    </p>
-                  </div>
+                  <span
+                    aria-hidden
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{
+                      backgroundColor: toneColor(
+                        muscleHue(exercise.primaryMuscleGroup),
+                      ),
+                    }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-semibold text-fg">
+                      {exercise.name}
+                    </span>
+                    <span className="block truncate text-[12px] capitalize text-fg-subtle">
+                      {exercise.primaryMuscleGroup} · {exercise.equipment}
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      "flex size-6 shrink-0 items-center justify-center rounded-full border",
+                      isSelected
+                        ? "border-accent bg-accent text-accent-fg"
+                        : "border-border",
+                    )}
+                  >
+                    {isSelected ? <Check className="size-3.5" /> : null}
+                  </span>
                 </button>
               </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function FilterChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "shrink-0 rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors",
-        active
-          ? "border-neutral-900 bg-neutral-900 text-white"
-          : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50",
+            );
+          })}
+        </ul>
       )}
-    >
-      {children}
-    </button>
+    </Sheet>
   );
 }
